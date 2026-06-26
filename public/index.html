@@ -180,6 +180,24 @@
 </div>
 
 
+
+<!-- Programs Modal -->
+<div class="modal-overlay" id="programsModal">
+  <div class="modal modal-lg">
+    <div class="modal-header"><span class="modal-title">Programs Management</span><button class="modal-close" onclick="closeModal('programsModal')">✕</button></div>
+    <div class="modal-body">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <p style="color:#808285;font-size:0.85rem">Organize classes into programs. Each class belongs to one program.</p>
+        <button class="btn btn-primary btn-sm" onclick="addProgram()">+ Add Program</button>
+      </div>
+      <div id="programsList"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('programsModal')">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- CSV Import Modal -->
 <div class="modal-overlay" id="csvImportModal">
   <div class="modal modal-lg">
@@ -211,6 +229,7 @@
   </div>
 </div>
 <!-- SINGLE SCRIPT — no conflicts -->
+<script src="assets_b64.js"></script>
 <script src="api.js"></script>
 <script src="app.js"></script>
 </body>

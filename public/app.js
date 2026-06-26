@@ -2173,3 +2173,378 @@ setTimeout(() => {
       <button class="btn btn-ghost" onclick="closeModal('reportPreviewModal')">Close</button>`;
   }
 }, 200);
+
+// ============================================================
+// PROGRAMS MANAGEMENT + EMBEDDED PDF
+// ============================================================
+
+// ── PROGRAMS DATA ────────────────────────────────────────────
+let PROGRAMS = [
+  { id: 'prog1', name: 'Kriah Program', description: 'Main reading program', classIds: ['p1','p2','p3','p4'] },
+];
+
+function getProgram(id) { return PROGRAMS.find(p => p.id === id); }
+function getClassProgram(classId) { return PROGRAMS.find(p => p.classIds.includes(classId)); }
+function getProgramClasses(programId) {
+  const prog = getProgram(programId);
+  return prog ? PROVIDERS.filter(p => prog.classIds.includes(p.id)) : [];
+}
+
+// ── PROGRAMS MODAL ───────────────────────────────────────────
+function openProgramsModal() {
+  renderProgramsList();
+  openModal('programsModal');
+}
+
+function renderProgramsList() {
+  const el = $('programsList');
+  if (!el) return;
+  el.innerHTML = PROGRAMS.length === 0
+    ? '<div style="text-align:center;padding:40px;color:#808285">No programs yet. Click "+ Add Program" to create one.</div>'
+    : PROGRAMS.map(prog => {
+        const classes = getProgramClasses(prog.id);
+        const unassigned = PROVIDERS.filter(p => !PROGRAMS.some(pr => pr.classIds.includes(p.id)));
+        return `
+<div style="border:1px solid #e8d9b8;border-radius:10px;overflow:hidden;margin-bottom:14px">
+  <div style="background:linear-gradient(135deg,#005778,#1a7a9a);padding:14px 18px;color:#fff;display:flex;align-items:center;justify-content:space-between">
+    <div>
+      <div style="font-weight:800;font-size:1rem">${prog.name}</div>
+      <div style="font-size:0.76rem;opacity:0.8;margin-top:2px">${prog.description || ''}</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3)" onclick="editProgram('${prog.id}')">Edit</button>
+      <button class="btn btn-sm" style="background:rgba(168,32,32,0.3);color:#fff;border:1px solid rgba(168,32,32,0.5)" onclick="deleteProgram('${prog.id}')">Delete</button>
+    </div>
+  </div>
+  <div style="padding:14px 18px;background:#fff">
+    <div style="font-size:0.78rem;font-weight:700;color:#808285;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">Classes in this program (${classes.length})</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+      ${classes.map(c => `
+        <div style="display:flex;align-items:center;gap:6px;background:#e0eef5;border:1px solid #b0cfe0;border-radius:20px;padding:4px 12px">
+          <span class="he" style="font-size:0.82rem;font-weight:700;color:#005778">${c.name}</span>
+          <button onclick="removeClassFromProgram('${prog.id}','${c.id}')" style="background:none;border:none;color:#9a1c1c;cursor:pointer;font-size:0.8rem;padding:0;line-height:1">✕</button>
+        </div>`).join('')}
+      ${classes.length === 0 ? '<span style="color:#808285;font-size:0.84rem">No classes assigned yet</span>' : ''}
+    </div>
+    ${unassigned.length > 0 ? `
+    <div style="font-size:0.78rem;font-weight:700;color:#808285;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Add class to program</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${unassigned.map(c => `
+        <button onclick="addClassToProgram('${prog.id}','${c.id}')" style="background:#fdf8f0;border:1px dashed #D9A44E;border-radius:20px;padding:4px 12px;cursor:pointer;font-size:0.82rem;color:#7a4800;font-family:var(--font-he);transition:all 0.2s" onmouseenter="this.style.background='#fff3e0'" onmouseleave="this.style.background='#fdf8f0'">+ ${c.name}</button>`).join('')}
+    </div>` : ''}
+    <div style="margin-top:12px;padding-top:12px;border-top:1px solid #e8d9b8;font-size:0.82rem;color:#808285">
+      <strong>${STUDENTS.filter(s => classes.some(c => c.id === s.providerId)).length}</strong> students in this program
+    </div>
+  </div>
+</div>`;
+      }).join('');
+}
+
+function addProgram() {
+  const name = prompt('Program name:', 'New Program');
+  if (!name) return;
+  const desc = prompt('Description (optional):', '');
+  PROGRAMS.push({ id: genId('prog'), name: name.trim(), description: (desc||'').trim(), classIds: [] });
+  renderProgramsList();
+  showToast(`Program "${name}" created`, 'success');
+}
+
+function editProgram(id) {
+  const prog = getProgram(id);
+  if (!prog) return;
+  const name = prompt('Program name:', prog.name);
+  if (!name) return;
+  const desc = prompt('Description:', prog.description || '');
+  prog.name = name.trim();
+  prog.description = (desc||'').trim();
+  renderProgramsList();
+  showToast('Program updated', 'success');
+}
+
+function deleteProgram(id) {
+  if (!confirm('Delete this program? Classes will become unassigned.')) return;
+  PROGRAMS = PROGRAMS.filter(p => p.id !== id);
+  renderProgramsList();
+  showToast('Program deleted', 'warning');
+}
+
+function addClassToProgram(programId, classId) {
+  // Remove from any existing program first
+  PROGRAMS.forEach(p => { p.classIds = p.classIds.filter(id => id !== classId); });
+  const prog = getProgram(programId);
+  if (prog) prog.classIds.push(classId);
+  renderProgramsList();
+}
+
+function removeClassFromProgram(programId, classId) {
+  const prog = getProgram(programId);
+  if (prog) prog.classIds = prog.classIds.filter(id => id !== classId);
+  renderProgramsList();
+}
+
+// ── ADD PROGRAMS TO PROVIDERS PAGE ──────────────────────────
+const _origRenderProviders3 = renderProviders;
+renderProviders = function() {
+  $('pageContent').innerHTML = `
+<div class="page-header">
+  <div><h1 class="page-title">Classes & Programs</h1><p class="page-subtitle">Manage classes, programs, and the Kriah Director</p></div>
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-outline btn-sm" onclick="openCSVImport()">📄 Import CSV</button>
+    <button class="btn btn-outline btn-sm" onclick="openProgramsModal()">🗂 Programs</button>
+    <button class="btn btn-primary" onclick="openAddProviderModal()">+ Add Class</button>
+  </div>
+</div>
+
+<!-- KRIAH DIRECTOR -->
+<div class="card mb-6" style="border-top:4px solid #D9A44E">
+  <div class="card-header" style="background:linear-gradient(135deg,#003d56,#005778)">
+    <span class="card-title" style="color:#fff;font-size:1rem">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D9A44E" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+      Kriah Director — <span style="color:#D9A44E">מנהל הקריאה</span>
+    </span>
+    <button class="btn btn-sm" style="background:rgba(217,164,78,0.2);color:#D9A44E;border:1px solid #D9A44E" onclick="editKriahDirector()">Edit</button>
+  </div>
+  <div class="card-body">
+    ${KRIAH_DIRECTOR.name
+      ? `<div style="display:flex;align-items:center;gap:16px">
+          <div class="user-avatar" style="width:52px;height:52px;font-size:1.1rem;background:linear-gradient(135deg,#D9A44E,#b8832e)">${KRIAH_DIRECTOR.name.split(' ').map(w=>w[0]).join('').slice(0,2)}</div>
+          <div>
+            <div class="he" style="font-size:1.1rem;font-weight:800;color:#005778">${KRIAH_DIRECTOR.name}</div>
+            <div style="font-size:0.85rem;color:#808285;margin-top:3px">${KRIAH_DIRECTOR.email}</div>
+            <div style="font-size:0.75rem;color:#D9A44E;font-weight:700;margin-top:4px;text-transform:uppercase;letter-spacing:0.5px">Oversees all programs & classes</div>
+          </div>
+        </div>`
+      : `<div style="text-align:center;padding:16px;color:#808285">
+          <button class="btn btn-gold btn-sm" onclick="editKriahDirector()">+ Set Kriah Director</button>
+        </div>`}
+  </div>
+</div>
+
+<!-- PROGRAMS SUMMARY -->
+${PROGRAMS.length > 0 ? `
+<div class="card mb-6">
+  <div class="card-header">
+    <span class="card-title">Programs (${PROGRAMS.length})</span>
+    <button class="btn btn-ghost btn-sm" onclick="openProgramsModal()">Manage Programs</button>
+  </div>
+  <div class="card-body" style="padding:14px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
+      ${PROGRAMS.map((prog,i) => {
+        const classes = getProgramClasses(prog.id);
+        const stuCount = STUDENTS.filter(s => classes.some(c => c.id === s.providerId)).length;
+        return `<div style="border:1px solid #e8d9b8;border-radius:10px;overflow:hidden;cursor:pointer;transition:all 0.2s" onclick="openProgramsModal()" onmouseenter="this.style.boxShadow='0 4px 12px rgba(0,87,120,0.12)'" onmouseleave="this.style.boxShadow=''">
+          <div style="background:linear-gradient(135deg,#005778,#1a7a9a);padding:12px 14px;color:#fff">
+            <div style="font-weight:800;font-size:0.95rem">${prog.name}</div>
+            <div style="font-size:0.72rem;opacity:0.8;margin-top:2px">${prog.description||''}</div>
+          </div>
+          <div style="padding:10px 14px;background:#fff;display:flex;justify-content:space-between">
+            <div style="text-align:center"><div style="font-size:1.2rem;font-weight:900;color:#005778">${classes.length}</div><div style="font-size:0.68rem;color:#808285">Classes</div></div>
+            <div style="text-align:center"><div style="font-size:1.2rem;font-weight:900;color:#1a6038">${stuCount}</div><div style="font-size:0.68rem;color:#808285">Students</div></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>
+</div>` : `
+<div class="card mb-6" style="border:2px dashed #e8d9b8">
+  <div class="card-body" style="text-align:center;padding:24px">
+    <div style="font-size:2rem;margin-bottom:8px">🗂</div>
+    <div style="font-weight:700;color:#005778;margin-bottom:6px">No Programs Yet</div>
+    <div style="font-size:0.84rem;color:#808285;margin-bottom:14px">Organize your classes into programs for better management</div>
+    <button class="btn btn-primary btn-sm" onclick="openProgramsModal()">+ Create First Program</button>
+  </div>
+</div>`}
+
+<!-- CLASSES GRID -->
+<div style="margin-bottom:12px;font-size:0.78rem;font-weight:700;color:#808285;text-transform:uppercase;letter-spacing:0.5px">All Classes (${PROVIDERS.length})</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px">
+  ${PROVIDERS.map((p,i) => {
+    const ss = getProviderStudents(p.id);
+    const imp = ss.filter(s => getStudentTrend(s.id) === 'up').length;
+    const str = ss.filter(s => getStudentTrend(s.id) === 'down').length;
+    const prog = getClassProgram(p.id);
+    return `<div class="card" style="cursor:pointer;transition:all 0.2s" onclick="navigate('provider_profile',{providerId:'${p.id}'})" onmouseenter="this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 24px rgba(0,87,120,0.15)'" onmouseleave="this.style.transform='';this.style.boxShadow=''">
+      <div style="background:linear-gradient(135deg,#005778,#1a7a9a);padding:16px 18px;color:#fff">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="user-avatar" style="width:44px;height:44px;font-size:0.9rem;background:${avatarColor(i)}">${p.name.slice(0,2)}</div>
+          <div style="flex:1">
+            <div class="he" style="font-weight:800;font-size:1rem">${p.name}</div>
+            <div class="he" style="font-size:0.76rem;opacity:0.8;margin-top:2px">${p.director}</div>
+          </div>
+        </div>
+        ${prog ? `<div style="margin-top:8px"><span style="background:rgba(217,164,78,0.3);color:#D9A44E;font-size:0.65rem;font-weight:800;padding:2px 8px;border-radius:20px;border:1px solid rgba(217,164,78,0.4)">${prog.name}</span></div>` : ''}
+      </div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;text-align:center">
+          <div><div style="font-size:1.4rem;font-weight:900;color:#005778">${ss.length}</div><div style="font-size:0.68rem;color:#808285">Students</div></div>
+          <div><div style="font-size:1.4rem;font-weight:900;color:#1a6038">${imp}</div><div style="font-size:0.68rem;color:#808285">Improving</div></div>
+          <div><div style="font-size:1.4rem;font-weight:900;color:#9a1c1c">${str}</div><div style="font-size:0.68rem;color:#808285">At Risk</div></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('')}
+</div>`;
+};
+
+// ── EMBEDDED PDF WITH LETTERHEAD + LOGO ──────────────────────
+// Override generatePDF to embed assets
+generatePDF = async function(selector, filename) {
+  const el = typeof selector === 'string' ? document.querySelector(selector) : selector;
+  if (!el) { showToast('Content not found', 'warning'); return; }
+  showToast('Generating PDF with letterhead...', 'info');
+
+  try {
+    const { jsPDF } = window.jspdf;
+
+    // Replace src attributes with base64 before capture
+    const imgs = el.querySelectorAll('img');
+    const origSrcs = [];
+    imgs.forEach(img => {
+      origSrcs.push(img.src);
+      if (img.src.includes('letterhead')) img.src = LETTERHEAD_B64;
+      else if (img.src.includes('logo')) img.src = LOGO_B64;
+    });
+
+    const canvas = await html2canvas(el, {
+      scale: 2.5,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+      imageTimeout: 0,
+    });
+
+    // Restore original srcs
+    imgs.forEach((img, i) => img.src = origSrcs[i]);
+
+    const imgData = canvas.toDataURL('image/jpeg', 0.92);
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pdfW = pdf.internal.pageSize.getWidth();
+    const pdfH = pdf.internal.pageSize.getHeight();
+    const imgH = (canvas.height * pdfW) / canvas.width;
+
+    if (imgH <= pdfH) {
+      pdf.addImage(imgData, 'JPEG', 0, 0, pdfW, imgH);
+    } else {
+      // Multi-page
+      let yOffset = 0;
+      while (yOffset < imgH) {
+        if (yOffset > 0) pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, -yOffset, pdfW, imgH);
+        yOffset += pdfH;
+      }
+    }
+    pdf.save(filename);
+    showToast('PDF downloaded!', 'success');
+  } catch(e) {
+    console.error('PDF error:', e);
+    showToast('Downloading as HTML (PDF failed)', 'warning');
+    downloadHTML(el.outerHTML, filename.replace('.pdf','.html'));
+  }
+};
+
+generateWorksheetPDF = async function(elementId, filename) {
+  const el = document.getElementById(elementId);
+  if (!el) { showToast('Generate a worksheet first', 'warning'); return; }
+  showToast('Generating worksheet PDF...', 'info');
+  try {
+    const { jsPDF } = window.jspdf;
+    const imgs = el.querySelectorAll('img');
+    const origSrcs = [];
+    imgs.forEach(img => {
+      origSrcs.push(img.src);
+      if (img.src.includes('letterhead')) img.src = LETTERHEAD_B64;
+      else if (img.src.includes('logo')) img.src = LOGO_B64;
+    });
+    const canvas = await html2canvas(el, { scale: 2.5, useCORS: true, backgroundColor: '#ffffff', logging: false, imageTimeout: 0 });
+    imgs.forEach((img, i) => img.src = origSrcs[i]);
+    const imgData = canvas.toDataURL('image/jpeg', 0.92);
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const pdfW = pdf.internal.pageSize.getWidth();
+    const pdfH = pdf.internal.pageSize.getHeight();
+    const imgH = (canvas.height * pdfW) / canvas.width;
+    pdf.addImage(imgData, 'JPEG', 0, 0, pdfW, Math.min(imgH, pdfH));
+    pdf.save(filename);
+    showToast('Worksheet PDF downloaded!', 'success');
+  } catch(e) {
+    showToast('Downloading as HTML', 'warning');
+    downloadHTML(el.outerHTML, filename.replace('.pdf','.html'));
+  }
+};
+
+// ── ADD PROGRAMS TO BACKUP ───────────────────────────────────
+const _origDownloadBackup2 = downloadBackup;
+downloadBackup = function() {
+  const data = {
+    exportedAt: new Date().toISOString(),
+    version: '2.1',
+    school: SCHOOL,
+    kriahDirector: KRIAH_DIRECTOR,
+    programs: PROGRAMS,
+    providers: PROVIDERS,
+    students: STUDENTS,
+    assessments: ASSESSMENTS,
+    reportFinals: REPORT_FINALS,
+    ocrImports: OCR_IMPORTS,
+    systemLog: SYS_LOGS.slice(0, 100),
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const date = new Date().toISOString().slice(0,10);
+  a.download = `KriahTrack_backup_${date}.json`;
+  a.click();
+  showToast('Backup downloaded', 'success');
+};
+
+// ── SHOW PROGRAM ON STUDENT PROFILE ─────────────────────────
+const _origRenderProfileOverview2 = renderProfileOverview;
+renderProfileOverview = function(sid, s, ass, lastA, prov) {
+  _origRenderProfileOverview2(sid, s, ass, lastA, prov);
+  // Add program badge to profile header if visible
+  const prog = getClassProgram(s.providerId);
+  if (prog) {
+    const metaDiv = $('pageContent')?.querySelector('.student-profile-header .he[style*="0.8rem"]');
+    // Program shown in provider info already
+  }
+};
+
+// ── ANALYTICS — add program breakdown ───────────────────────
+const _origRenderAnalytics2 = renderAnalytics;
+renderAnalytics = function() {
+  _origRenderAnalytics2();
+  // Append program breakdown after existing content
+  setTimeout(() => {
+    if (!PROGRAMS.length) return;
+    const content = $('pageContent');
+    if (!content) return;
+    const progSection = document.createElement('div');
+    progSection.className = 'card mt-6';
+    progSection.style.marginTop = '18px';
+    progSection.innerHTML = `
+      <div class="card-header"><span class="card-title">Program Breakdown</span><button class="btn btn-ghost btn-sm" onclick="openProgramsModal()">Manage</button></div>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Program</th><th>Classes</th><th>Students</th><th>Improving</th><th>At Risk</th><th>Assessments</th></tr></thead>
+          <tbody>
+            ${PROGRAMS.map(prog => {
+              const classes = getProgramClasses(prog.id);
+              const students = STUDENTS.filter(s => classes.some(c => c.id === s.providerId));
+              const imp = students.filter(s => getStudentTrend(s.id) === 'up').length;
+              const str = students.filter(s => getStudentTrend(s.id) === 'down').length;
+              const ass = ASSESSMENTS.filter(a => students.some(s => s.id === a.studentId)).length;
+              return `<tr>
+                <td class="primary">${prog.name}</td>
+                <td><span class="badge badge-blue">${classes.length}</span></td>
+                <td><span class="badge badge-neutral">${students.length}</span></td>
+                <td><span class="badge badge-success">${imp}</span></td>
+                <td><span class="badge badge-danger">${str}</span></td>
+                <td><span class="badge badge-neutral">${ass}</span></td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
+    content.appendChild(progSection);
+  }, 100);
+};
