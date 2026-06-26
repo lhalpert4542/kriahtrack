@@ -8,6 +8,10 @@ const CATS=[
 ];
 const HEB_MONTHS=[{id:'tishrei',label:'תשרי',order:1},{id:'cheshvan',label:'חשון',order:2},{id:'kislev',label:'כסלו',order:3},{id:'tevet',label:'טבת',order:4},{id:'shvat',label:'שבט',order:5},{id:'adar',label:'אדר',order:6},{id:'nisan',label:'ניסן',order:7},{id:'iyar',label:'אייר',order:8},{id:'sivan',label:'סיון',order:9},{id:'tamuz',label:'תמוז',order:10},{id:'av',label:'אב',order:11},{id:'elul',label:'אלול',order:12}];
 const CUR_YEAR='תשפ״ו',CUR_MONTH='sivan',HEB_TODAY='כ״ו סיון תשפ״ו';
+const HEB_YEARS = ['תשפ״ו','תשפ״ז','תשפ״ח','תשפ״ט'];
+function yearSelect(selectedYear) {
+  return HEB_YEARS.map(y => `<option value="${y}" ${y===selectedYear?'selected':''}>${y}</option>`).join('');
+}
 // Single school, multiple classes
 let SCHOOL = { name: 'מוסד הקריאה', classes: ['א׳','ב׳','ג׳','ד׳','ה׳','ו׳'] };
 let KRIAH_DIRECTOR = { name: '', email: '' }; // Set by admin
@@ -199,7 +203,7 @@ function catGrid(cats,data){return`<div style="display:grid;grid-template-column
 function renderProfileOverview(sid,s,ass,lastA,prov){
   $('profileContent').innerHTML=`
 <div class="grid-2 mb-6">
-  <div class="card"><div class="card-header"><span class="card-title">Current Month — <span class="he">${lastA?getMonthLabel(lastA.month)+' '+lastA.year:'No data'}</span></span></div><div class="card-body">${lastA?catGrid(CATS,lastA)+`<div style="background:#e0eef5;border:1px solid #b0cfe0;border-radius:8px;padding:10px;margin-top:12px;font-size:0.82rem;color:#005778">ℹ No overall score — each category is measured separately</div>`:`<div style="text-align:center;padding:40px;color:#808285">No assessments yet<br><button class="btn btn-primary" style="margin-top:12px" onclick="openAddAssessmentModal('${sid}')">Add First Assessment</button></div>`}</div></div>
+  <div class="card"><div class="card-header"><span class="card-title">Current Month — <span class="he">${lastA?getMonthLabel(lastA.month)+' '+lastA.year:'No data'}</span></span></div><div class="card-body">${lastA?catGrid(CATS,lastA):`<div style="text-align:center;padding:40px;color:#808285">No assessments yet<br><button class="btn btn-primary" style="margin-top:12px" onclick="openAddAssessmentModal('${sid}')">Add First Assessment</button></div>`}</div></div>
   <div class="card"><div class="card-header"><span class="card-title">YTD Summary — <span class="he">${s.year}</span></span></div><div class="card-body">
     ${CATS.map(cat=>{const totC=ass.reduce((sum,a)=>sum+(a.categories[cat.id]?.correct||0),0),totM=ass.reduce((sum,a)=>sum+(a.categories[cat.id]?.mistakes||0),0);return`<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span class="he" style="font-weight:700;font-size:0.85rem;color:${cat.color}">${cat.label}</span><span style="font-size:0.78rem"><span style="color:#1a6038;font-weight:700">${totC}</span> / <span style="color:#9a1c1c;font-weight:700">${totM}</span></span></div><div style="background:#f0ece4;border-radius:20px;height:6px;overflow:hidden"><div style="height:100%;border-radius:20px;background:${cat.color};width:${Math.min(100,totC*2)}%"></div></div></div>`;}).join('')}
     <div style="border-top:1px solid #e8d9b8;margin-top:12px;padding-top:12px"><div style="display:flex;justify-content:space-between;font-size:0.84rem;margin-bottom:6px"><span style="color:#808285">Total Assessments</span><span style="font-weight:800">${ass.length}</span></div><div style="display:flex;justify-content:space-between;font-size:0.84rem"><span style="color:#808285">Provider</span><span class="he" style="font-weight:700">${prov?prov.name:'—'}</span></div></div>
@@ -1155,3 +1159,533 @@ ${wd.length === 0
   `;
   document.head.appendChild(style);
 })();
+
+// ============================================================
+// NEW FEATURES — Report header, downloads, videos, final reports
+// ============================================================
+
+// ── VIDEO STORAGE (in-memory, keyed by studentId_month_year) ─
+let STUDENT_VIDEOS = {}; // { 's1_sivan_תשפ״ו': { url, name, month, year, studentId } }
+
+function getVideoKey(sid, month, year) { return `${sid}_${month}_${year}`; }
+function getStudentVideo(sid, month, year) { return STUDENT_VIDEOS[getVideoKey(sid, month, year)] || null; }
+function saveStudentVideo(sid, month, year, file) {
+  const url = URL.createObjectURL(file);
+  STUDENT_VIDEOS[getVideoKey(sid, month, year)] = { url, name: file.name, month, year, studentId: sid, size: file.size };
+}
+
+// ── DOWNLOAD HELPER ──────────────────────────────────────────
+function downloadHTML(htmlContent, filename) {
+  const blob = new Blob([`<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>
+  body{font-family:'Frank Ruhl Libre',serif;direction:rtl;margin:0;padding:20px;background:#fff}
+  @page{margin:12mm}
+  .no-print{display:none}
+</style>
+</head><body>${htmlContent}</body></html>`], {type:'text/html'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ── REPORT HEADER — matches attached image ───────────────────
+function buildReportHeader(studentName, monthLabel, year) {
+  return `
+<div style="background:linear-gradient(180deg,#005778 0%,#1a7a9a 100%);padding:0;border-radius:12px 12px 0 0;overflow:hidden">
+  <!-- Teal curved top -->
+  <div style="background:linear-gradient(135deg,#005778,#1a7a9a);padding:20px 24px 30px;text-align:center;position:relative">
+    <!-- Gold flourishes + logo -->
+    <div style="display:flex;align-items:center;justify-content:center;gap:12px">
+      <div style="color:#D9A44E;font-size:2.5rem;line-height:1;opacity:0.9">❧</div>
+      <div style="position:relative">
+        <img src="assets/logo.png" style="width:80px;height:80px;object-fit:contain;filter:drop-shadow(0 3px 10px rgba(0,0,0,0.4));border-radius:50%;background:rgba(255,255,255,0.1);padding:4px" onerror="this.style.display='none'">
+      </div>
+      <div style="color:#D9A44E;font-size:2.5rem;line-height:1;opacity:0.9">❦</div>
+    </div>
+    <!-- Gold bottom wave -->
+    <div style="position:absolute;bottom:0;left:0;right:0;height:20px;background:#fff;border-radius:50% 50% 0 0 / 100% 100% 0 0"></div>
+  </div>
+  <!-- White section with title -->
+  <div style="background:#fff;padding:16px 28px 12px;text-align:center">
+    <div class="he" style="font-size:2rem;font-weight:900;color:#005778;letter-spacing:0.5px">קריאה קארטל</div>
+    <div class="he" style="font-size:0.9rem;color:#808285;margin-top:4px">אונזער תלמיד</div>
+    <div class="he" style="font-size:1.4rem;font-weight:900;color:#1a2a2a;margin-top:6px">${studentName}</div>
+    <div class="he" style="font-size:0.85rem;color:#808285;margin-top:6px">${monthLabel} ${year}</div>
+  </div>
+</div>`;
+}
+
+// ── FULL REPORT OVERRIDE with new header + download + video ──
+showStudentReport = function(sid, targetMonth, targetYear) {
+  const s = getStudent(sid);
+  const allAss = getStudentAssessments(sid);
+  const prov = getProvider(s.providerId);
+  if (!allAss.length) { showToast('No assessments for report', 'warning'); return; }
+
+  const month = targetMonth || allAss[allAss.length - 1].month;
+  const year  = targetYear  || allAss[allAss.length - 1].year;
+  const monthLabel = getMonthLabel(month);
+  const currentA = allAss.find(a => a.month === month && a.year === year);
+  if (!currentA) { showToast('No assessment for selected month', 'warning'); return; }
+
+  const monthOrder = getMonthOrder(month);
+  const ytdAss = allAss.filter(a => getMonthOrder(a.month) <= monthOrder && a.year === year);
+
+  const isFinal = isReportFinal(sid, month, year);
+  const savedNote = getReportNote(sid, month, year);
+  const savedLang = getReportLang(sid, month, year);
+  const trend = getStudentTrend(sid);
+  const directorName = KRIAH_DIRECTOR.name || (prov ? prov.director : '');
+  const video = getStudentVideo(sid, month, year);
+
+  const reportHTML = `
+<div id="reportDoc" style="font-family:'Frank Ruhl Libre','Heebo',serif;direction:rtl;max-width:680px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,87,120,0.12)">
+
+  ${buildReportHeader(`${s.firstName} ${s.lastName}`, monthLabel, year)}
+
+  <!-- SCORES -->
+  <div style="padding:16px 28px;background:#fff">
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;direction:rtl">
+      ${CATS.map(cat => {
+        const correct  = currentA.categories[cat.id]?.correct  || 0;
+        const mistakes = currentA.categories[cat.id]?.mistakes || 0;
+        return `<div style="background:#005778;border-radius:10px;padding:14px 6px;text-align:center;color:#fff">
+          <div class="he" style="font-size:0.6rem;font-weight:700;color:rgba(255,255,255,0.8);margin-bottom:8px;line-height:1.4">${cat.label}</div>
+          <div style="font-size:1.9rem;font-weight:900;line-height:1">${correct}</div>
+          ${cat.hasMistakes ? `<div style="font-size:0.62rem;color:rgba(255,180,180,0.9);margin-top:4px">${mistakes} err.</div>` : `<div style="height:16px"></div>`}
+        </div>`;
+      }).join('')}
+    </div>
+  </div>
+
+  <!-- YTD TABLE -->
+  <div style="padding:0 28px 16px;background:#fff">
+    <table style="width:100%;border-collapse:collapse;direction:rtl;font-size:0.82rem">
+      <thead>
+        <tr style="background:#005778;color:#fff">
+          <th style="padding:9px 10px;text-align:right;font-weight:700">חודש</th>
+          ${CATS.map(cat => `<th style="padding:9px 8px;text-align:center;font-weight:700;border-right:1px solid rgba(255,255,255,0.2)"><span class="he" style="font-size:0.7rem">${cat.label}</span></th>`).join('')}
+        </tr>
+      </thead>
+      <tbody>
+        ${ytdAss.map((a, i) => {
+          const isCurrent = a.month === month;
+          return `<tr style="background:${isCurrent?'#e0eef5':i%2===0?'#fff':'#f8f9fa'};font-weight:${isCurrent?'700':'400'}">
+            <td style="padding:8px 10px;text-align:right;border-bottom:1px solid #e8d9b8">
+              <span class="he" style="color:${isCurrent?'#005778':'#333'}">${getMonthLabel(a.month)}</span>
+            </td>
+            ${CATS.map(cat => {
+              const correct  = a.categories[cat.id]?.correct  || 0;
+              const mistakes = a.categories[cat.id]?.mistakes || 0;
+              return `<td style="padding:8px;text-align:center;border-bottom:1px solid #e8d9b8;border-right:1px solid #e8d9b8">
+                <span style="font-weight:700;color:#005778">${correct}</span>
+                ${cat.hasMistakes && mistakes > 0 ? `<span style="font-size:0.62rem;color:#9a1c1c;display:block">-${mistakes}</span>` : ''}
+              </td>`;
+            }).join('')}
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- NOTE -->
+  <div style="padding:0 28px 16px;background:#fff">
+    ${isFinal
+      ? (savedNote ? `<div style="border:1px solid #e8d9b8;border-radius:8px;padding:14px;background:#fdf8f0"><div style="font-size:0.85rem;color:#333;line-height:1.8;${savedLang==='yi'?'direction:rtl;text-align:right;font-family:var(--font-he)':''}">${savedNote}</div></div>` : '<div style="height:40px"></div>')
+      : `<div class="no-print" style="border:1px solid #e8d9b8;border-radius:8px;overflow:hidden">
+          <div style="background:#f0f0f0;padding:8px 14px;display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:0.78rem;font-weight:700;color:#444">Note (optional)</span>
+            <div style="display:flex;gap:6px;align-items:center">
+              <select id="noteLang" style="font-size:0.76rem;padding:3px 8px;border:1px solid #ddd;border-radius:4px" onchange="switchNoteLang(this.value,'${sid}','${month}','${year}')">
+                <option value="en" ${savedLang==='en'?'selected':''}>English</option>
+                <option value="yi" ${savedLang==='yi'?'selected':''}>Yiddish</option>
+              </select>
+              <button class="btn btn-sm" style="background:#005778;color:#fff;font-size:0.72rem;padding:4px 10px" onclick="aiGenerateNote('${sid}','${month}','${year}')">✨ AI Generate</button>
+            </div>
+          </div>
+          <textarea id="reportNoteInput" rows="3" style="width:100%;padding:12px;border:none;font-size:0.85rem;font-family:${savedLang==='yi'?'var(--font-he)':'var(--font-en)'};direction:${savedLang==='yi'?'rtl':'ltr'};resize:vertical;outline:none;color:#333;line-height:1.7" placeholder="${savedLang==='yi'?'שרייב אן אנמערקונג...':'Write a note...'}" oninput="saveReportNote('${sid}','${month}','${year}',this.value,document.getElementById('noteLang').value)">${savedNote}</textarea>
+        </div>
+        ${savedNote ? `<div style="border:1px solid #e8d9b8;border-radius:8px;padding:14px;background:#fdf8f0;margin-top:8px;${savedLang==='yi'?'direction:rtl;text-align:right;font-family:var(--font-he)':''}"><div id="noteLivePreview" style="font-size:0.85rem;color:#333;line-height:1.8">${savedNote}</div></div>` : '<div id="noteLivePreview" style="display:none"></div>'}`}
+  </div>
+
+  <!-- DIRECTOR -->
+  <div style="padding:0 28px 16px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #e8d9b8;padding-top:12px;background:#fff">
+    <div style="font-size:0.82rem;color:#444">
+      <span style="font-weight:700;color:#808285;text-transform:uppercase;font-size:0.7rem;letter-spacing:0.5px">Director: </span>
+      <span class="he" style="font-weight:700;color:#005778">${directorName}</span>
+    </div>
+    <div style="font-size:0.75rem;color:#808285">KriahTrack</div>
+  </div>
+
+  <!-- BOTTOM BANNER -->
+  <div style="background:linear-gradient(135deg,#005778,#1a7a9a);height:8px"></div>
+</div>`;
+
+  $('reportPreviewBody').innerHTML = `
+<!-- STATUS BAR -->
+<div class="no-print" style="background:${isFinal?'#e4f2eb':'#fff3e0'};border:1px solid ${isFinal?'#a8d8bc':'#ecc870'};border-radius:8px;padding:10px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;font-size:0.84rem">
+  <span style="font-weight:700;color:${isFinal?'#1a6038':'#7a4800'}">${isFinal ? '✓ Report Finalized' : '✏ Draft — not yet finalized'}</span>
+  <div style="display:flex;gap:8px">
+    ${isFinal
+      ? `<button class="btn btn-sm" style="background:#fff;border:1px solid #808285;color:#808285" onclick="unlockReport('${sid}','${month}','${year}');showStudentReport('${sid}','${month}','${year}')">🔓 Unlock</button>`
+      : `<button class="btn btn-primary btn-sm" onclick="finalizeReport('${sid}','${month}','${year}');showStudentReport('${sid}','${month}','${year}')">✓ Mark as Final</button>`}
+    <button class="btn btn-gold btn-sm" onclick="downloadReport('${sid}','${month}','${year}')">⬇ Download</button>
+  </div>
+</div>
+${reportHTML}`;
+
+  // Store for download
+  window._currentReportHTML = reportHTML;
+  window._currentReportMeta = { sid, month, year, name: `${s.firstName} ${s.lastName}` };
+
+  // Wire live preview
+  setTimeout(() => {
+    const ta = document.getElementById('reportNoteInput');
+    if (ta) {
+      ta.addEventListener('input', () => {
+        const preview = document.getElementById('noteLivePreview');
+        if (preview) { preview.innerHTML = ta.value || ''; preview.style.display = ta.value ? 'block' : 'none'; }
+        saveReportNote(sid, month, year, ta.value, document.getElementById('noteLang')?.value || 'en');
+      });
+    }
+  }, 100);
+
+  openModal('reportPreviewModal');
+};
+
+function downloadReport(sid, month, year) {
+  const html = window._currentReportHTML || $('reportDoc')?.outerHTML || '';
+  const s = getStudent(sid);
+  const name = s ? `${s.firstName}_${s.lastName}` : 'report';
+  downloadHTML(html, `report_${name}_${getMonthLabel(month)}_${year}.html`);
+  showToast('Report downloaded', 'success');
+}
+
+function downloadWorksheet() {
+  const doc = $('worksheetDoc');
+  if (!doc) { showToast('Generate a worksheet first', 'warning'); return; }
+  downloadHTML(doc.outerHTML, `worksheet_${getMonthLabel(_wsMonth)}_${CUR_YEAR}.html`);
+  showToast('Worksheet downloaded', 'success');
+}
+
+// ── STUDENT PROFILE — fix report button + final reports list ─
+const _origRenderStudentProfile = renderStudentProfile;
+renderStudentProfile = function(sid) {
+  const s = getStudent(sid);
+  if (!s) { $('pageContent').innerHTML = '<div style="padding:40px">Student not found</div>'; return; }
+  const ass = getStudentAssessments(sid);
+  const prov = getProvider(s.providerId);
+  const t = getStudentTrend(sid);
+  const lastA = ass[ass.length - 1];
+  const hs = $('headerSubBreadcrumb');
+  if (hs) hs.innerHTML = ` › <span class="he">${sName(s)}</span>`;
+
+  $('pageContent').innerHTML = `
+<div style="margin-bottom:14px"><button class="btn btn-ghost btn-sm" onclick="navigate('students')">← Back to Students</button></div>
+<div class="student-profile-header">
+  <div style="display:flex;align-items:center;gap:18px">
+    <div class="user-avatar" style="width:64px;height:64px;font-size:1.4rem">${initials(sName(s))}</div>
+    <div style="flex:1">
+      <div class="he" style="font-size:1.4rem;font-weight:800;color:#fff">${sName(s)}</div>
+      <div class="he" style="font-size:0.9rem;color:rgba(255,255,255,0.8);margin-top:4px">${s.class}</div>
+      <div style="display:flex;gap:14px;margin-top:7px;flex-wrap:wrap">
+        <span style="font-size:0.82rem;color:rgba(255,255,255,0.8)">📍 <span class="he">${prov ? prov.name : '—'}</span></span>
+        <span class="he" style="font-size:0.82rem;color:rgba(255,255,255,0.8)">${s.year}</span>
+        ${trendBadge(t)}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-gold btn-sm" onclick="openAddAssessmentModal('${sid}')">+ Assessment</button>
+      <button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3)" onclick="${lastA ? `showStudentReport('${sid}','${lastA.month}','${lastA.year}')` : "showToast('No assessments yet','warning')"}">📄 Report</button>
+      <button class="btn btn-sm" style="background:rgba(217,164,78,0.3);color:#fff;border:1px solid rgba(217,164,78,0.5)" onclick="showFinalReports('${sid}')">✓ Final Reports</button>
+    </div>
+  </div>
+</div>
+
+<div style="display:flex;border-bottom:2px solid #e8d9b8;margin-bottom:22px">
+  ${['overview','assessments','charts','videos'].map(tab => `
+    <button style="padding:9px 18px;font-size:0.84rem;font-weight:${_profileTab===tab?'700':'600'};color:${_profileTab===tab?'#005778':'#808285'};cursor:pointer;border:none;background:${_profileTab===tab?'#e0eef5':'transparent'};border-bottom:2px solid ${_profileTab===tab?'#005778':'transparent'};margin-bottom:-2px;border-radius:${_profileTab===tab?'8px 8px 0 0':'0'}" onclick="_profileTab='${tab}';renderStudentProfile('${sid}')">${{overview:'Overview',assessments:`Assessments (${ass.length})`,charts:'Charts',videos:'Videos'}[tab]}</button>`).join('')}
+</div>
+<div id="profileContent"></div>`;
+
+  if (_profileTab === 'overview')      renderProfileOverview(sid, s, ass, lastA, prov);
+  else if (_profileTab === 'assessments') renderProfileAssessments(sid, ass);
+  else if (_profileTab === 'charts')   renderProfileCharts(sid, ass);
+  else if (_profileTab === 'videos')   renderStudentVideos(sid, s, ass);
+};
+
+// ── FINAL REPORTS MODAL ──────────────────────────────────────
+function showFinalReports(sid) {
+  const s = getStudent(sid);
+  const ass = getStudentAssessments(sid);
+  const finals = ass.filter(a => isReportFinal(sid, a.month, a.year));
+
+  const html = finals.length === 0
+    ? '<div style="text-align:center;padding:40px;color:#808285">No finalized reports yet.<br>Generate and finalize reports from the Monthly Reports page.</div>'
+    : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">
+        ${finals.map(a => `
+          <div style="border:1px solid #e8d9b8;border-radius:10px;overflow:hidden;cursor:pointer;transition:all 0.2s" onclick="showStudentReport('${sid}','${a.month}','${a.year}')" onmouseenter="this.style.boxShadow='0 4px 12px rgba(0,87,120,0.15)'" onmouseleave="this.style.boxShadow=''">
+            <div style="background:linear-gradient(135deg,#005778,#1a7a9a);padding:12px 14px;color:#fff">
+              <div class="he" style="font-weight:800;font-size:0.95rem">${getMonthLabel(a.month)}</div>
+              <div class="he" style="font-size:0.75rem;opacity:0.8">${a.year}</div>
+            </div>
+            <div style="padding:10px 14px;background:#fff">
+              ${CATS.map(cat => `<div style="display:flex;justify-content:space-between;font-size:0.78rem;padding:2px 0">
+                <span class="he" style="color:${cat.color};font-weight:600">${cat.label}</span>
+                <span style="font-weight:700;color:#005778">${a.categories[cat.id]?.correct||0}</span>
+              </div>`).join('')}
+            </div>
+            <div style="padding:8px 14px;background:#fdf8f0;border-top:1px solid #e8d9b8;display:flex;gap:6px">
+              <button class="btn btn-primary btn-sm" style="flex:1" onclick="event.stopPropagation();showStudentReport('${sid}','${a.month}','${a.year}')">View</button>
+              <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();downloadReport('${sid}','${a.month}','${a.year}')">⬇</button>
+            </div>
+          </div>`).join('')}
+      </div>`;
+
+  // Use a simple overlay
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,61,86,0.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px;box-shadow:0 24px 56px rgba(0,87,120,0.18);width:100%;max-width:700px;max-height:85vh;overflow-y:auto">
+      <div style="background:linear-gradient(135deg,#003d56,#005778);padding:18px 24px;border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:1rem;font-weight:800;color:#fff">Final Reports — <span class="he">${sName(s)}</span></span>
+        <button onclick="this.closest('[style*=fixed]').remove()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;color:#fff;cursor:pointer;font-size:0.9rem">✕</button>
+      </div>
+      <div style="padding:20px">${html}</div>
+    </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+// ── STUDENT VIDEOS TAB ───────────────────────────────────────
+function renderStudentVideos(sid, s, ass) {
+  const months = ass.map(a => ({ month: a.month, year: a.year, label: getMonthLabel(a.month) }));
+  $('profileContent').innerHTML = `
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+  <h3>Reading Videos — <span class="he">${sName(s)}</span></h3>
+  <div style="font-size:0.84rem;color:#808285">One video per month</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px">
+  ${months.map(m => {
+    const video = getStudentVideo(sid, m.month, m.year);
+    return `<div style="border:1px solid #e8d9b8;border-radius:12px;overflow:hidden">
+      <div style="background:linear-gradient(135deg,#005778,#1a7a9a);padding:12px 16px;color:#fff">
+        <div class="he" style="font-weight:800">${m.label} ${m.year}</div>
+      </div>
+      <div style="padding:14px;background:#fff">
+        ${video
+          ? `<video src="${video.url}" controls style="width:100%;border-radius:8px;max-height:160px;background:#000"></video>
+             <div style="font-size:0.75rem;color:#808285;margin-top:6px;text-align:center">${video.name}</div>
+             <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:8px" onclick="uploadVideoFor('${sid}','${m.month}','${m.year}')">Replace Video</button>`
+          : `<div style="border:2px dashed #b0cfe0;border-radius:8px;padding:24px;text-align:center;cursor:pointer;background:#e0eef5" onclick="uploadVideoFor('${sid}','${m.month}','${m.year}')">
+               <div style="font-size:2rem;margin-bottom:6px">🎥</div>
+               <div style="font-size:0.82rem;color:#005778;font-weight:600">Upload Video</div>
+               <div style="font-size:0.72rem;color:#808285;margin-top:3px">MP4, MOV, WebM</div>
+             </div>`}
+      </div>
+    </div>`;
+  }).join('')}
+  ${months.length === 0 ? '<div style="text-align:center;padding:40px;color:#808285;grid-column:1/-1">Add assessments first to enable video uploads</div>' : ''}
+</div>`;
+}
+
+function uploadVideoFor(sid, month, year) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'video/*';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 200 * 1024 * 1024) { showToast('Video must be under 200MB', 'warning'); return; }
+    saveStudentVideo(sid, month, year, file);
+    showToast(`Video uploaded for ${getMonthLabel(month)}`, 'success');
+    renderStudentProfile(sid);
+  };
+  input.click();
+}
+
+// ── UPLOAD VIDEOS PAGE ───────────────────────────────────────
+const _origNavigate = navigate;
+navigate = function(page, params = {}) {
+  if (page === 'videos') {
+    _page = 'videos'; _params = params;
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    const el = document.querySelector('.nav-item[data-page="videos"]');
+    if (el) el.classList.add('active');
+    const hb = $('headerBreadcrumb'); if (hb) hb.textContent = 'Upload Videos';
+    const hs = $('headerSubBreadcrumb'); if (hs) hs.textContent = '';
+    destroyCharts();
+    const content = $('pageContent');
+    content.style.opacity = '0';
+    requestAnimationFrame(() => {
+      renderVideosPage();
+      content.style.transition = 'opacity 0.2s';
+      content.style.opacity = '1';
+      closeSidebar();
+    });
+    return;
+  }
+  _origNavigate(page, params);
+};
+
+function renderVideosPage() {
+  $('pageContent').innerHTML = `
+<div class="page-header">
+  <div><h1 class="page-title">Upload Videos</h1><p class="page-subtitle">Upload monthly reading videos for all students</p></div>
+</div>
+<div class="card mb-6">
+  <div class="card-header"><span class="card-title">Filter</span></div>
+  <div class="card-body">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="form-group"><label class="form-label">Class</label>
+        <select class="form-control" id="vidClass" onchange="renderVideosPage()">
+          <option value="">All Classes</option>
+          ${PROVIDERS.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Month</label>
+        <select class="form-control he" id="vidMonth" onchange="renderVideosPage()">
+          ${HEB_MONTHS.map(m => `<option value="${m.id}" ${m.id===CUR_MONTH?'selected':''}>${m.label}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="videosGrid"></div>`;
+  renderVideosGrid();
+}
+
+function renderVideosGrid() {
+  const classFilter = $('vidClass')?.value || '';
+  const month = $('vidMonth')?.value || CUR_MONTH;
+  const year = CUR_YEAR;
+  const students = classFilter ? getProviderStudents(classFilter) : STUDENTS;
+
+  $('videosGrid').innerHTML = `
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px">
+  ${students.map((s, i) => {
+    const video = getStudentVideo(s.id, month, year);
+    return `<div style="border:1px solid #e8d9b8;border-radius:12px;overflow:hidden">
+      <div style="background:linear-gradient(135deg,#005778,#1a7a9a);padding:12px 16px;color:#fff;display:flex;align-items:center;gap:10px">
+        <div class="user-avatar" style="width:32px;height:32px;font-size:0.7rem;background:${avatarColor(i)}">${initials(sName(s))}</div>
+        <div>
+          <div class="he" style="font-weight:800;font-size:0.9rem">${sName(s)}</div>
+          <div style="font-size:0.72rem;opacity:0.8">${getProvider(s.providerId)?.name||''}</div>
+        </div>
+      </div>
+      <div style="padding:12px;background:#fff">
+        ${video
+          ? `<video src="${video.url}" controls style="width:100%;border-radius:6px;max-height:140px;background:#000"></video>
+             <div style="font-size:0.72rem;color:#808285;margin-top:5px;text-align:center">${video.name}</div>
+             <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:8px" onclick="uploadVideoForGrid('${s.id}','${month}','${year}')">Replace</button>`
+          : `<div style="border:2px dashed #b0cfe0;border-radius:8px;padding:20px;text-align:center;cursor:pointer;background:#e0eef5" onclick="uploadVideoForGrid('${s.id}','${month}','${year}')">
+               <div style="font-size:1.8rem;margin-bottom:4px">🎥</div>
+               <div style="font-size:0.8rem;color:#005778;font-weight:600">Upload Video</div>
+             </div>`}
+      </div>
+    </div>`;
+  }).join('')}
+</div>`;
+}
+
+function uploadVideoForGrid(sid, month, year) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'video/*';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 200 * 1024 * 1024) { showToast('Video must be under 200MB', 'warning'); return; }
+    saveStudentVideo(sid, month, year, file);
+    showToast(`Video uploaded for ${getStudentName ? getStudentName(getStudent(sid)) : sid}`, 'success');
+    renderVideosGrid();
+  };
+  input.click();
+}
+
+// ── ADD VIDEOS TO SIDEBAR ────────────────────────────────────
+(function addVideoNav() {
+  const nav = document.querySelector('.sidebar-nav');
+  if (!nav) return;
+  // Add after Tools section
+  const toolsLabel = Array.from(nav.querySelectorAll('.nav-section-label')).find(el => el.textContent === 'Tools');
+  if (toolsLabel) {
+    const videoItem = document.createElement('div');
+    videoItem.className = 'nav-item';
+    videoItem.setAttribute('data-page', 'videos');
+    videoItem.onclick = () => navigate('videos');
+    videoItem.innerHTML = `<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>Videos`;
+    // Insert before System section
+    const sysLabel = Array.from(nav.querySelectorAll('.nav-section-label')).find(el => el.textContent === 'System');
+    if (sysLabel) nav.insertBefore(videoItem, sysLabel);
+    else nav.appendChild(videoItem);
+  }
+})();
+
+// ── DOWNLOAD BUTTON IN WORKSHEET ────────────────────────────
+const _origGenWorksheet = genWorksheet;
+genWorksheet = function() {
+  _origGenWorksheet();
+  // Add download button after generation
+  setTimeout(() => {
+    const preview = $('wsPreview');
+    if (!preview || !preview.innerHTML) return;
+    const dlBtn = document.createElement('div');
+    dlBtn.className = 'no-print';
+    dlBtn.style.cssText = 'margin-top:12px;display:flex;gap:10px';
+    dlBtn.innerHTML = `<button class="btn btn-gold" onclick="downloadWorksheet()">⬇ Download Worksheet</button>`;
+    preview.appendChild(dlBtn);
+  }, 100);
+};
+
+// ── FIX REPORT MODAL FOOTER BUTTONS ─────────────────────────
+(function fixReportModalFooter() {
+  const footer = document.querySelector('#reportPreviewModal .modal-footer');
+  if (footer) {
+    footer.innerHTML = `
+      <button class="btn btn-primary" onclick="printReport()">🖨 Print</button>
+      <button class="btn btn-gold" onclick="downloadReport(window._currentReportMeta?.sid,window._currentReportMeta?.month,window._currentReportMeta?.year)">⬇ Download</button>
+      <button class="btn btn-ghost" onclick="closeModal('reportPreviewModal')">Close</button>`;
+  }
+})();
+
+// ── STUDENT NAME ABOVE CLASS IN PROFILE HEADER ───────────────
+// Already handled in renderStudentProfile override above
+
+// ── YEAR SELECT IN WORKSHEET/REPORTS ────────────────────────
+const _origRenderWorksheets = renderWorksheets;
+renderWorksheets = function() {
+  $('pageContent').innerHTML = `
+<div class="page-header"><div><h1 class="page-title">Worksheets</h1><p class="page-subtitle">Generate handwriting grading sheets — landscape format</p></div></div>
+<div class="card mb-6">
+  <div class="card-header"><span class="card-title">Worksheet Settings</span></div>
+  <div class="card-body">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
+      <div class="form-group"><label class="form-label">Class *</label>
+        <select class="form-control" id="wsProv" onchange="_wsProv=this.value">
+          <option value="">Select class...</option>
+          ${PROVIDERS.map(p=>`<option value="${p.id}" ${_wsProv===p.id?'selected':''}>${p.name}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Hebrew Month *</label>
+        <select class="form-control he" id="wsMonth" onchange="_wsMonth=this.value">
+          ${HEB_MONTHS.map(m=>`<option value="${m.id}" ${_wsMonth===m.id?'selected':''}>${m.label}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Hebrew Year</label>
+        <select class="form-control he" id="wsYear" onchange="_wsYear=this.value">
+          ${yearSelect(CUR_YEAR)}
+        </select>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="btn btn-primary" onclick="genWorksheet()">Generate Sheet</button>
+      <button class="btn btn-gold" onclick="printWorksheet()">🖨 Print (Landscape)</button>
+    </div>
+  </div>
+</div>
+<div id="wsPreview"></div>`;
+};
+let _wsYear = CUR_YEAR;
