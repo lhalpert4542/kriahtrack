@@ -19,6 +19,12 @@ function setLoadProgress(pct, msg) {
 
 // ---- BOOTSTRAP ----
 async function bootstrap() {
+  // Hard failsafe — always show app within 8 seconds no matter what
+  const failsafe = setTimeout(() => {
+    console.warn('Failsafe: showing app after timeout');
+    showApp(false);
+  }, 8000);
+
   try {
     setLoadProgress(10, 'בודק חיבור לשרת...');
     await API.health();
@@ -27,68 +33,69 @@ async function bootstrap() {
     DB.providers = await API.getProviders();
 
     setLoadProgress(45, 'טוען תלמידים...');
-    DB.students = await API.getStudents();
+    const rawStudents = await API.getStudents();
+    DB.students = rawStudents.map(s => ({
+      ...s,
+      firstName:  s.first_name  || s.firstName  || '',
+      lastName:   s.last_name   || s.lastName   || '',
+      providerId: s.provider_id || s.providerId || '',
+    }));
 
     setLoadProgress(65, 'טוען הערכות...');
-    DB.assessments = await API.getAssessments();
+    const rawAssessments = await API.getAssessments();
+    DB.assessments = rawAssessments.map(normalizeAssessment);
 
-    setLoadProgress(80, 'טוען לוגים...');
-    DB.systemLog = await API.getSystemLogs();
-    DB.auditLog  = (await API.getAuditLogs()).map(r => ({
-      ...r,
-      action: r.action, entity: r.entity, entityName: r.entity_name,
-      field: r.field, before: r.before_val, after: r.after_val,
-      user: r.user_name, timestamp: r.created_at,
-    }));
-    DB.ocrImports = await API.getOCRImports();
-
-    setLoadProgress(95, 'מכין ממשק...');
-
-    // Normalize assessment data from flat DB columns → categories object
-    DB.assessments = DB.assessments.map(normalizeAssessment);
-
-    // Normalize student field names
-    DB.students = DB.students.map(s => ({
-      ...s,
-      firstName: s.first_name || s.firstName,
-      lastName:  s.last_name  || s.lastName,
-      providerId: s.provider_id || s.providerId,
-    }));
-
-    updateBadges();
-    updateServerStatus(true);
+    setLoadProgress(82, 'טוען לוגים...');
+    try {
+      DB.systemLog  = await API.getSystemLogs();
+      const audit   = await API.getAuditLogs();
+      DB.auditLog   = audit.map(r => ({
+        ...r, entityName: r.entity_name || r.entityName || '',
+        before: r.before_val || r.before || '',
+        after:  r.after_val  || r.after  || '',
+        user:   r.user_name  || r.user   || 'מנהל',
+        timestamp: r.created_at || r.timestamp || '',
+      }));
+      DB.ocrImports = await API.getOCRImports();
+    } catch(logErr) {
+      console.warn('Logs load failed (non-fatal):', logErr);
+    }
 
     setLoadProgress(100, 'מוכן!');
-    setTimeout(() => {
-      document.getElementById('loadingScreen').style.display = 'none';
-      document.getElementById('appShell').style.display = 'flex';
-      navigate('dashboard');
-      showToast('KriahTrack — נתונים נטענו בהצלחה', 'success');
-    }, 400);
+    clearTimeout(failsafe);
+    updateServerStatus(true);
+    setTimeout(() => showApp(true), 300);
 
   } catch (err) {
     console.error('Bootstrap error:', err);
-    setLoadProgress(100, 'שגיאת חיבור — טוען נתוני דמו...');
+    clearTimeout(failsafe);
+    setLoadProgress(100, 'טוען נתוני דמו...');
     updateServerStatus(false);
-    // Fall back to in-memory demo data (already seeded in data.js)
-    DB.assessments = DB.assessments.map(a => {
-      if (a.categories) return a;
-      return normalizeAssessment(a);
-    });
+    // Normalize existing in-memory data from data.js seed
     DB.students = DB.students.map(s => ({
       ...s,
-      firstName: s.first_name || s.firstName,
-      lastName:  s.last_name  || s.lastName,
-      providerId: s.provider_id || s.providerId,
+      firstName:  s.first_name  || s.firstName  || '',
+      lastName:   s.last_name   || s.lastName   || '',
+      providerId: s.provider_id || s.providerId || '',
     }));
-    updateBadges();
-    setTimeout(() => {
-      document.getElementById('loadingScreen').style.display = 'none';
-      document.getElementById('appShell').style.display = 'flex';
-      navigate('dashboard');
-      showToast('מצב לא מקוון — נתונים לא יישמרו', 'warning');
-    }, 1200);
+    DB.assessments = DB.assessments.map(a => a.categories ? a : normalizeAssessment(a));
+    setTimeout(() => showApp(false), 600);
   }
+}
+
+function showApp(online) {
+  const loading = document.getElementById('loadingScreen');
+  const shell   = document.getElementById('appShell');
+  if (loading) loading.style.display = 'none';
+  if (shell)   shell.style.display   = 'flex';
+  updateBadges();
+  navigate('dashboard');
+  setTimeout(() => {
+    showToast(
+      online ? 'KriahTrack — נתונים נטענו בהצלחה ✓' : 'מצב לא מקוון — נתוני דמו',
+      online ? 'success' : 'warning'
+    );
+  }, 500);
 }
 
 function normalizeAssessment(a) {
