@@ -295,117 +295,17 @@ function getCategoryChartData(assessments, catId) {
 }
 
 // ---- CURRENT STUDENT (for assessment modal) ----
-let _currentAssessmentStudentId = null;
 
-function openAddAssessmentModal(studentId) {
-  _currentAssessmentStudentId = studentId;
-  const student = getStudent(studentId);
-  document.getElementById('assessmentModalTitle').textContent = `הוספת הערכה — ${getStudentName(student)}`;
-  populateMonthSelect('assessmentMonth', CURRENT_HEBREW_MONTH);
-  buildCategoryInputs('assessmentCategoryInputs', null);
-  openModal('addAssessmentModal');
-}
 
-function saveAssessment() {
-  const studentId = _currentAssessmentStudentId;
-  const month = document.getElementById('assessmentMonth').value;
-  const year = document.getElementById('assessmentYear').value;
-  if (!studentId || !month) { showToast('נא לבחור חודש', 'warning'); return; }
-
-  const dup = checkDuplicate(studentId, month, year);
-  if (dup) {
-    if (!confirm(`קיימת כבר הערכה לחודש ${getMonthLabel(month)}. האם לדרוס?`)) return;
-    DB.assessments = DB.assessments.filter(a => a.id !== dup.id);
-    addAuditEntry('דריסת הערכה', 'הערכה', getStudentName(getStudent(studentId)), 'חודש', getMonthLabel(month), 'עודכן');
-  }
-
-  const categories = readCategoryInputs();
-  const newAssessment = {
-    id: generateId('a'),
-    studentId, providerId: getStudent(studentId).providerId,
-    month, year, source: 'manual',
-    createdAt: new Date().toISOString(),
-    categories,
-  };
-  DB.assessments.push(newAssessment);
-  addAuditEntry('הוספת הערכה', 'תלמיד', getStudentName(getStudent(studentId)), 'חודש', '—', getMonthLabel(month));
-  addSystemLog('success', `הערכה נוספה — ${getStudentName(getStudent(studentId))} — ${getMonthLabel(month)}`);
-  closeModal('addAssessmentModal');
-  showToast('הערכה נשמרה בהצלחה', 'success');
-  if (currentPage === 'student_profile') navigate('student_profile', { studentId });
-}
 
 // ---- ADD STUDENT ----
-function openAddStudentModal() {
-  const provSel = document.getElementById('newStudentProvider');
-  provSel.innerHTML = '<option value="">בחר ספק...</option>' +
-    DB.providers.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-  document.getElementById('newStudentFirst').value = '';
-  document.getElementById('newStudentLast').value = '';
-  openModal('addStudentModal');
-}
 
-document.addEventListener('change', function(e) {
-  if (e.target.id === 'newStudentProvider') {
-    const prov = getProvider(e.target.value);
-    const classSel = document.getElementById('newStudentClass');
-    classSel.innerHTML = '<option value="">בחר כיתה...</option>' +
-      (prov ? prov.classes.map(c => `<option value="${c}">${c}</option>`).join('') : '');
-  }
-});
 
-function saveNewStudent() {
-  const first = document.getElementById('newStudentFirst').value.trim();
-  const last = document.getElementById('newStudentLast').value.trim();
-  const providerId = document.getElementById('newStudentProvider').value;
-  const cls = document.getElementById('newStudentClass').value;
-  if (!first || !last || !providerId || !cls) { showToast('נא למלא את כל השדות הנדרשים', 'warning'); return; }
-  const newStudent = { id: generateId('s'), firstName: first, lastName: last, providerId, class: cls, year: 'תשפ״ו', status: 'active' };
-  DB.students.push(newStudent);
-  addAuditEntry('הוספת תלמיד', 'תלמיד', `${first} ${last}`, '—', '—', 'נוצר');
-  addSystemLog('info', `תלמיד חדש נוסף: ${first} ${last}`);
-  document.getElementById('studentsBadge').textContent = DB.students.length;
-  closeModal('addStudentModal');
-  showToast(`תלמיד ${first} ${last} נוסף בהצלחה`, 'success');
-  if (currentPage === 'students') renderStudents();
-}
 
 // ---- ADD PROVIDER ----
-function openAddProviderModal() {
-  ['newProviderName','newProviderDirector','newProviderEmail','newProviderCity','newProviderPhone'].forEach(id => {
-    const el = document.getElementById(id); if (el) el.value = '';
-  });
-  openModal('addProviderModal');
-}
 
-function saveNewProvider() {
-  const name = document.getElementById('newProviderName').value.trim();
-  const director = document.getElementById('newProviderDirector').value.trim();
-  const email = document.getElementById('newProviderEmail').value.trim();
-  const city = document.getElementById('newProviderCity').value.trim();
-  const phone = document.getElementById('newProviderPhone').value.trim();
-  if (!name || !director || !email) { showToast('נא למלא שם, מנהל ואימייל', 'warning'); return; }
-  const newProvider = { id: generateId('p'), name, director, email, city, phone, classes: ['א׳','ב׳'] };
-  DB.providers.push(newProvider);
-  addAuditEntry('הוספת ספק', 'ספק', name, '—', '—', 'נוצר');
-  addSystemLog('info', `ספק חדש נוסף: ${name}`);
-  document.getElementById('providersBadge').textContent = DB.providers.length;
-  closeModal('addProviderModal');
-  showToast(`ספק "${name}" נוסף בהצלחה`, 'success');
-  if (currentPage === 'providers') renderProviders();
-}
 
 // ---- DELETE ASSESSMENT ----
-function deleteAssessment(assessmentId, studentId) {
-  if (!confirm('האם למחוק הערכה זו?')) return;
-  const a = DB.assessments.find(x => x.id === assessmentId);
-  if (!a) return;
-  addAuditEntry('מחיקת הערכה', 'הערכה', getStudentName(getStudent(a.studentId)), 'חודש', getMonthLabel(a.month), 'נמחק');
-  DB.assessments = DB.assessments.filter(x => x.id !== assessmentId);
-  addSystemLog('warning', `הערכה נמחקה — ${getStudentName(getStudent(studentId))} — ${getMonthLabel(a.month)}`);
-  showToast('הערכה נמחקה', 'warning');
-  navigate('student_profile', { studentId });
-}
 // ---- HEBREW DATE DISPLAY ----
 function hebrewYear() { return CURRENT_HEBREW_YEAR; }
 function hebrewMonthLabel(monthId) { return getMonthLabel(monthId); }
