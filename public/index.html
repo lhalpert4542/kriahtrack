@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+
+<html dir="rtl" lang="he">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>KriahTrack — מערכת הקריאה</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&amp;family=Frank+Ruhl+Libre:wght@300;400;500;700;900&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<link href="styles.css" rel="stylesheet"/>
+</head>
+<body>
+<div class="toast-container" id="toastContainer"></div>
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+<!-- LOADING SCREEN -->
+<div id="loadingScreen" style="position:fixed;inset:0;background:linear-gradient(135deg,#0d3d3d,#1a6060);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;color:#fff">
+<img onerror="this.style.display='none'" src="assets/logo.png?expires=1785032493&amp;signature=63100c1fb43c328c5bcb0b58616fe95192c3fc51d0e1ee998a49a6c376eb7261" style="width:90px;height:90px;object-fit:contain;margin-bottom:24px;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.4))"/>
+<div style="font-size:1.8rem;font-weight:800;margin-bottom:8px">KriahTrack</div>
+<div style="font-size:1rem;opacity:0.7;margin-bottom:32px">מערכת מעקב קריאה</div>
+<div style="width:200px;height:4px;background:rgba(255,255,255,0.2);border-radius:2px;overflow:hidden">
+<div id="loadBar" style="height:100%;background:linear-gradient(90deg,#d4a820,#e2c050);border-radius:2px;width:0%;transition:width 0.4s ease"></div>
+</div>
+<div id="loadMsg" style="margin-top:12px;font-size:0.85rem;opacity:0.6">טוען נתונים...</div>
+</div>
+<div class="app-shell" id="appShell" style="display:none">
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+<div class="sidebar-logo">
+<img alt="מערכת הקריאה" onerror="this.style.display='none'" src="assets/logo.png?expires=1785032493&amp;signature=63100c1fb43c328c5bcb0b58616fe95192c3fc51d0e1ee998a49a6c376eb7261"/>
+<div class="sidebar-logo-text">
+<div class="app-name">KriahTrack</div>
+<div class="app-subtitle">מערכת מעקב קריאה</div>
+</div>
+</div>
+<nav class="sidebar-nav">
+<div class="nav-section-label">ראשי</div>
+<div class="nav-item active" data-page="dashboard" onclick="navigate('dashboard')">
+<svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><rect height="7" width="7" x="3" y="3"></rect><rect height="7" width="7" x="14" y="3"></rect><rect height="7" width="7" x="14" y="14"></rect><rect height="7" width="7" x="3" y="14"></rect></svg>
+        לוח בקרה
+      </div>
+<div class="nav-item" data-page="analytics" onclick="navigate('analytics')">
+<svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+        אנליטיקה
+      </div>
+<div class="nav-section-label">ניהול</div>
+<div class="nav-item" data-page="students" onclick="navigate('students')">
+<svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+        תלמידים
+        <span class="nav-badge" id="studentsBadge">—</span>
+</div>
+<div class="nav-item" data-page="providers" onclick="navigate('providers')">
+<svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+        ספקים
+        <span class="nav-badge" id="providersBadge">—</span>
+</div>
+<div class="nav-section-label">כלים</div>
+<div class="nav-item" data-page="worksheets" onclick="navigate('worksheets')">
+<svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" x2="8" y1="13" y2="13"></line><line x1="16" x2="8" y1="17" y2="17"></line></svg>
+        גיליונות עבודה
+      </div>
+<div class="nav-item" data-page="reports" onclick="navigate('reports')">
+<svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+        דוחות חודשיים
+      </div>
+<div class="nav-item" data-page="ocr" onclick="navigate('ocr')">
+<svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><rect height="18" rx="2" width="18" x="3" y="3"></rect><path d="M3 9h18M9 21V9"></path></svg>
+        העלאת גיליון
+        <span class="nav-badge" style="background:var(--gold-500)">OCR</span>
+</div>
+<div class="nav-section-label">מערכת</div>
+<div class="nav-item" data-page="admin" onclick="navigate('admin')">
+<svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M20 12h2M2 12h2M17.66 17.66l-1.41-1.41M6.34 17.66l1.41-1.41"></path></svg>
+        פאנל ניהול
+      </div>
+</nav>
+<div class="sidebar-footer">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+<div id="serverStatusDot" style="width:8px;height:8px;border-radius:50%;background:var(--success);flex-shrink:0"></div>
+<span id="serverStatusText" style="font-size:0.72rem;color:var(--teal-300)">מחובר לשרת</span>
+</div>
+<div class="sidebar-user">
+<div class="user-avatar">מנ</div>
+<div class="user-info">
+<div class="user-name">מנהל מערכת</div>
+<div class="user-role">Administrator</div>
+</div>
+</div>
+</div>
+</aside>
+<!-- MAIN -->
+<main class="main-content">
+<header class="top-header">
+<button class="mobile-menu-btn" onclick="toggleSidebar()">
+<svg fill="none" height="20" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="20"><line x1="3" x2="21" y1="12" y2="12"></line><line x1="3" x2="21" y1="6" y2="6"></line><line x1="3" x2="21" y1="18" y2="18"></line></svg>
+</button>
+<div class="header-breadcrumb">
+<span id="headerBreadcrumb">לוח בקרה</span>
+<span id="headerSubBreadcrumb" style="color:var(--text-muted);font-size:0.85rem"></span>
+</div>
+<div class="header-actions">
+<div class="hebrew-date-badge">כ״ו סיון תשפ״ו</div>
+<button class="header-btn" onclick="navigate('ocr')" title="העלאת גיליון">
+<svg fill="none" height="18" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="18"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" x2="12" y1="3" y2="15"></line></svg>
+</button>
+<button class="header-btn" onclick="API.downloadBackup()" title="גיבוי נתונים">
+<svg fill="none" height="18" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="18"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>
+</button>
+<button class="header-btn" onclick="showNotifications()" style="position:relative" title="התראות">
+<svg fill="none" height="18" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="18"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+<span class="notif-dot"></span>
+</button>
+</div>
+</header>
+<div class="page-content animate-fade" id="pageContent">
+<div style="display:flex;align-items:center;justify-content:center;height:60vh">
+<div class="spinner" style="width:48px;height:48px;border-width:4px"></div>
+</div>
+</div>
+</main>
+</div>
+<!-- MODALS -->
+<div class="modal-overlay" id="addStudentModal">
+<div class="modal">
+<div class="modal-header"><span class="modal-title">הוספת תלמיד חדש</span><button class="modal-close" onclick="closeModal('addStudentModal')">✕</button></div>
+<div class="modal-body">
+<div class="form-row">
+<div class="form-group"><label class="form-label">שם פרטי *</label><input class="form-control" id="newStudentFirst" placeholder="שם פרטי" type="text"/></div>
+<div class="form-group"><label class="form-label">שם משפחה *</label><input class="form-control" id="newStudentLast" placeholder="שם משפחה" type="text"/></div>
+</div>
+<div class="form-row">
+<div class="form-group"><label class="form-label">ספק *</label><select class="form-control" id="newStudentProvider" onchange="updateClassOptions(this.value)"><option value="">בחר ספק...</option></select></div>
+<div class="form-group"><label class="form-label">כיתה *</label><select class="form-control" id="newStudentClass"><option value="">בחר כיתה...</option></select></div>
+</div>
+<div class="form-row">
+<div class="form-group"><label class="form-label">שנת לימוד</label><input class="form-control" id="newStudentYear" type="text" value="תשפ״ו"/></div>
+<div class="form-group"><label class="form-label">הערות</label><input class="form-control" id="newStudentNotes" placeholder="הערות אופציונליות" type="text"/></div>
+</div>
+</div>
+<div class="modal-footer">
+<button class="btn btn-primary" onclick="saveNewStudent()">שמור תלמיד</button>
+<button class="btn btn-ghost" onclick="closeModal('addStudentModal')">ביטול</button>
+</div>
+</div>
+</div>
+<div class="modal-overlay" id="addAssessmentModal">
+<div class="modal modal-lg">
+<div class="modal-header"><span class="modal-title" id="assessmentModalTitle">הוספת הערכה</span><button class="modal-close" onclick="closeModal('addAssessmentModal')">✕</button></div>
+<div class="modal-body">
+<div class="form-row">
+<div class="form-group"><label class="form-label">חודש עברי *</label><select class="form-control" id="assessmentMonth"><option value="">בחר חודש...</option></select></div>
+<div class="form-group"><label class="form-label">שנה עברית</label><input class="form-control" id="assessmentYear" readonly="" type="text" value="תשפ״ו"/></div>
+</div>
+<div class="divider"></div>
+<h4 style="margin-bottom:12px;color:var(--teal-800)">ציוני קטגוריות — אין ציון כולל</h4>
+<div id="assessmentCategoryInputs"></div>
+</div>
+<div class="modal-footer">
+<button class="btn btn-primary" onclick="saveAssessment()">שמור הערכה</button>
+<button class="btn btn-ghost" onclick="closeModal('addAssessmentModal')">ביטול</button>
+</div>
+</div>
+</div>
+<div class="modal-overlay" id="addProviderModal">
+<div class="modal">
+<div class="modal-header"><span class="modal-title">הוספת ספק חדש</span><button class="modal-close" onclick="closeModal('addProviderModal')">✕</button></div>
+<div class="modal-body">
+<div class="form-group"><label class="form-label">שם הספק *</label><input class="form-control" id="newProviderName" placeholder="שם הספק / מוסד" type="text"/></div>
+<div class="form-row">
+<div class="form-group"><label class="form-label">שם המנהל *</label><input class="form-control" id="newProviderDirector" placeholder="שם מלא" type="text"/></div>
+<div class="form-group"><label class="form-label">אימייל *</label><input class="form-control" id="newProviderEmail" placeholder="email@example.com" style="direction:ltr;text-align:left" type="email"/></div>
+</div>
+<div class="form-row">
+<div class="form-group"><label class="form-label">עיר</label><input class="form-control" id="newProviderCity" placeholder="עיר" type="text"/></div>
+<div class="form-group"><label class="form-label">טלפון</label><input class="form-control" id="newProviderPhone" placeholder="000-000-0000" style="direction:ltr;text-align:left" type="tel"/></div>
+</div>
+</div>
+<div class="modal-footer">
+<button class="btn btn-primary" onclick="saveNewProvider()">שמור ספק</button>
+<button class="btn btn-ghost" onclick="closeModal('addProviderModal')">ביטול</button>
+</div>
+</div>
+</div>
+<div class="modal-overlay" id="reportPreviewModal">
+<div class="modal modal-xl">
+<div class="modal-header"><span class="modal-title">תצוגה מקדימה של דוח</span><button class="modal-close" onclick="closeModal('reportPreviewModal')">✕</button></div>
+<div class="modal-body" id="reportPreviewBody"></div>
+<div class="modal-footer">
+<button class="btn btn-primary" onclick="window.print()">הדפס</button>
+<button class="btn btn-ghost" onclick="closeModal('reportPreviewModal')">סגור</button>
+</div>
+</div>
+</div>
+<div class="modal-overlay" id="notificationsPanel">
+<div class="modal" style="max-width:420px;margin-right:auto;margin-left:28px;margin-top:80px;align-self:flex-start">
+<div class="modal-header"><span class="modal-title">התראות מערכת</span><button class="modal-close" onclick="closeModal('notificationsPanel')">✕</button></div>
+<div class="modal-body" id="notificationsBody"></div>
+</div>
+</div>
+<script src="api.js"></script>
+<script src="data.js"></script>
+<script src="utils.js"></script>
+<script src="ocr_engine.js"></script>
+<script src="pages.js"></script>
+<script src="app_connected.js"></script>
+</body>
+</html>
