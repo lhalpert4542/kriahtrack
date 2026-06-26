@@ -5,19 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>KriahTrack</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Frank+Ruhl+Libre:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Frank+Ruhl+Libre:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link href="styles.css" rel="stylesheet">
 </head>
 <body>
-
 <div class="toast-container" id="toastContainer"></div>
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 
 <div class="app-shell" id="appShell">
-
-  <!-- SIDEBAR -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-logo">
       <img src="assets/logo.png" alt="KriahTrack" onerror="this.style.display='none'">
@@ -26,68 +22,51 @@
         <div class="app-subtitle">Kriah Progress System</div>
       </div>
     </div>
-
     <nav class="sidebar-nav">
       <div class="nav-section-label">Main</div>
       <div class="nav-item active" onclick="navigate('dashboard')" data-page="dashboard">
-        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-        Dashboard
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Dashboard
       </div>
       <div class="nav-item" onclick="navigate('analytics')" data-page="analytics">
-        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-        Analytics
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Analytics
       </div>
-
       <div class="nav-section-label">Management</div>
       <div class="nav-item" onclick="navigate('students')" data-page="students">
-        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        Students
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Students
         <span class="nav-badge" id="studentsBadge">12</span>
       </div>
       <div class="nav-item" onclick="navigate('providers')" data-page="providers">
-        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-        Providers
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Providers
         <span class="nav-badge" id="providersBadge">4</span>
       </div>
-
       <div class="nav-section-label">Tools</div>
       <div class="nav-item" onclick="navigate('worksheets')" data-page="worksheets">
-        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-        Worksheets
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Worksheets
       </div>
       <div class="nav-item" onclick="navigate('reports')" data-page="reports">
-        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-        Monthly Reports
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Monthly Reports
       </div>
       <div class="nav-item" onclick="navigate('ocr')" data-page="ocr">
-        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-        Upload Worksheet
-        <span class="nav-badge" style="background:var(--gold-500)">OCR</span>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>Upload Worksheet
+        <span class="nav-badge" style="background:#D9A44E">OCR</span>
       </div>
-
       <div class="nav-section-label">System</div>
       <div class="nav-item" onclick="navigate('admin')" data-page="admin">
-        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M20 12h2M2 12h2M17.66 17.66l-1.41-1.41M6.34 17.66l1.41-1.41"/></svg>
-        Admin Panel
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M20 12h2M2 12h2M17.66 17.66l-1.41-1.41M6.34 17.66l1.41-1.41"/></svg>Admin Panel
       </div>
     </nav>
-
     <div class="sidebar-footer">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:0 4px">
-        <div id="serverStatusDot" style="width:8px;height:8px;border-radius:50%;background:var(--gold-400);flex-shrink:0;transition:background 0.3s"></div>
-        <span id="serverStatusText" style="font-size:0.68rem;color:var(--teal-300);letter-spacing:0.3px">Demo mode</span>
+        <div id="serverStatusDot" style="width:8px;height:8px;border-radius:50%;background:#D9A44E;flex-shrink:0;transition:background 0.3s"></div>
+        <span id="serverStatusText" style="font-size:0.68rem;color:rgba(255,255,255,0.5)">Demo mode</span>
       </div>
       <div class="sidebar-user">
         <div class="user-avatar">SA</div>
-        <div class="user-info">
-          <div class="user-name">System Admin</div>
-          <div class="user-role">Administrator</div>
-        </div>
+        <div class="user-info"><div class="user-name">System Admin</div><div class="user-role">Administrator</div></div>
       </div>
     </div>
   </aside>
 
-  <!-- MAIN -->
   <main class="main-content">
     <header class="top-header">
       <button class="mobile-menu-btn" onclick="toggleSidebar()">
@@ -95,14 +74,14 @@
       </button>
       <div class="header-breadcrumb">
         <span id="headerBreadcrumb">Dashboard</span>
-        <span id="headerSubBreadcrumb" style="color:var(--text-muted);font-size:0.85rem"></span>
+        <span id="headerSubBreadcrumb" style="color:#808285;font-size:0.85rem"></span>
       </div>
       <div class="header-actions">
         <div class="date-badge he" id="hebrewDateBadge">כ״ו סיון תשפ״ו</div>
         <button class="header-btn" onclick="navigate('ocr')" title="Upload Worksheet">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         </button>
-        <button class="header-btn" onclick="API.downloadBackup()" title="Download Backup">
+        <button class="header-btn" onclick="try{API.downloadBackup();}catch(e){}" title="Download Backup">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         </button>
         <button class="header-btn" onclick="showNotifications()" title="Alerts" style="position:relative">
@@ -111,8 +90,7 @@
         </button>
       </div>
     </header>
-
-    <div class="page-content animate-fade" id="pageContent"></div>
+    <div class="page-content" id="pageContent"></div>
   </main>
 </div>
 
@@ -150,7 +128,7 @@
         <div class="form-group"><label class="form-label">Hebrew Year</label><input type="text" class="form-control he" id="assessmentYear" value="תשפ״ו" readonly></div>
       </div>
       <div class="divider"></div>
-      <h4 style="margin-bottom:12px;color:var(--teal-800)">Category Scores — No overall score</h4>
+      <h4 style="margin-bottom:12px;color:#005778">Category Scores — No overall score</h4>
       <div id="assessmentCategoryInputs"></div>
     </div>
     <div class="modal-footer">
@@ -199,11 +177,8 @@
   </div>
 </div>
 
+<!-- SINGLE SCRIPT — no conflicts -->
 <script src="api.js"></script>
-<script src="data.js"></script>
-<script src="utils.js"></script>
-<script src="ocr_engine.js"></script>
-<script src="pages.js"></script>
-<script src="app_connected.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
