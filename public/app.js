@@ -1689,3 +1689,487 @@ renderWorksheets = function() {
 <div id="wsPreview"></div>`;
 };
 let _wsYear = CUR_YEAR;
+
+// ============================================================
+// COMPREHENSIVE UPDATE — PDF, CSV, Letterhead, Layout fixes
+// ============================================================
+
+// ── PDF GENERATION ───────────────────────────────────────────
+async function generatePDF(elementId, filename) {
+  const el = document.getElementById(elementId) || document.querySelector(elementId);
+  if (!el) { showToast('Content not found for PDF', 'warning'); return; }
+  showToast('Generating PDF...', 'info');
+  try {
+    const { jsPDF } = window.jspdf;
+    const canvas = await html2canvas(el, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+    });
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pdfW = pdf.internal.pageSize.getWidth();
+    const pdfH = (canvas.height * pdfW) / canvas.width;
+    if (pdfH > pdf.internal.pageSize.getHeight()) {
+      // Multi-page
+      const pageH = pdf.internal.pageSize.getHeight();
+      let yPos = 0;
+      while (yPos < pdfH) {
+        if (yPos > 0) pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, -yPos, pdfW, pdfH);
+        yPos += pageH;
+      }
+    } else {
+      pdf.addImage(imgData, 'JPEG', 0, 0, pdfW, pdfH);
+    }
+    pdf.save(filename);
+    showToast('PDF downloaded!', 'success');
+  } catch(e) {
+    console.error('PDF error:', e);
+    showToast('PDF generation failed — downloading HTML instead', 'warning');
+    downloadHTML(el.outerHTML, filename.replace('.pdf', '.html'));
+  }
+}
+
+async function generateWorksheetPDF(elementId, filename) {
+  const el = document.getElementById(elementId);
+  if (!el) { showToast('Generate a worksheet first', 'warning'); return; }
+  showToast('Generating PDF...', 'info');
+  try {
+    const { jsPDF } = window.jspdf;
+    const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false });
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const pdfW = pdf.internal.pageSize.getWidth();
+    const pdfH = (canvas.height * pdfW) / canvas.width;
+    pdf.addImage(imgData, 'JPEG', 0, 0, pdfW, Math.min(pdfH, pdf.internal.pageSize.getHeight()));
+    pdf.save(filename);
+    showToast('Worksheet PDF downloaded!', 'success');
+  } catch(e) {
+    showToast('PDF failed — downloading HTML', 'warning');
+    downloadHTML(el.outerHTML, filename.replace('.pdf', '.html'));
+  }
+}
+
+// Override download functions to use PDF
+downloadReport = function(sid, month, year) {
+  const s = getStudent(sid);
+  const name = s ? `${s.firstName}_${s.lastName}` : 'report';
+  const monthLabel = getMonthLabel(month);
+  const filename = `${name}_${monthLabel}_${year}.pdf`;
+  // Try to use visible report doc
+  const el = document.getElementById('reportDoc');
+  if (el) {
+    generatePDF('#reportDoc', filename);
+  } else {
+    // Generate report first then download
+    showStudentReport(sid, month, year);
+    setTimeout(() => generatePDF('#reportDoc', filename), 800);
+  }
+};
+
+downloadWorksheet = function() {
+  const prov = getProvider(_wsProv);
+  const provName = prov ? prov.name.replace(/\s+/g,'_') : 'worksheet';
+  const monthLabel = getMonthLabel(_wsMonth);
+  const filename = `${provName}_${monthLabel}_${CUR_YEAR}.pdf`;
+  generateWorksheetPDF('worksheetDoc', filename);
+};
+
+// ── LETTERHEAD REPORT — centered layout matching attached ────
+buildReportHeader = function(studentName, monthLabel, year) {
+  return `
+<div style="position:relative;width:100%;overflow:hidden">
+  <!-- Letterhead as background image -->
+  <div style="position:relative;background:#fff">
+    <!-- Top teal banner with logo (from letterhead) -->
+    <div style="background:linear-gradient(135deg,#005778,#1a7a9a);padding:0;text-align:center;position:relative;overflow:hidden">
+      <!-- Gold flourishes row -->
+      <div style="display:flex;align-items:center;justify-content:center;padding:18px 24px 28px;gap:0;position:relative">
+        <!-- Left flourish -->
+        <div style="flex:1;text-align:right;padding-right:8px">
+          <span style="color:#D9A44E;font-size:3rem;line-height:1;opacity:0.9;font-family:serif">❧</span>
+        </div>
+        <!-- Center: logo + text -->
+        <div style="text-align:center;z-index:2">
+          <div style="position:relative;display:inline-block">
+            <!-- Gold ring around logo -->
+            <div style="width:90px;height:90px;border-radius:50%;background:linear-gradient(135deg,#D9A44E,#b8832e);padding:4px;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,0.3)">
+              <div style="width:82px;height:82px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden">
+                <img src="assets/logo.png" style="width:76px;height:76px;object-fit:contain" onerror="this.parentElement.innerHTML='<div style=font-size:1.8rem>📖</div>'">
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Right flourish -->
+        <div style="flex:1;text-align:left;padding-left:8px">
+          <span style="color:#D9A44E;font-size:3rem;line-height:1;opacity:0.9;font-family:serif">❦</span>
+        </div>
+      </div>
+      <!-- White curved bottom -->
+      <div style="position:absolute;bottom:-1px;left:0;right:0;height:24px;background:#fff;border-radius:50% 50% 0 0 / 100% 100% 0 0"></div>
+    </div>
+
+    <!-- White content area — centered -->
+    <div style="background:#fff;padding:20px 32px 16px;text-align:center">
+      <div class="he" style="font-size:2.2rem;font-weight:900;color:#005778;letter-spacing:0.5px;line-height:1.2">קריאה קארטל</div>
+      <div class="he" style="font-size:1rem;color:#808285;margin-top:8px">אונזער תלמיד</div>
+      <div class="he" style="font-size:1.6rem;font-weight:900;color:#1a2a2a;margin-top:8px">${studentName}</div>
+      <div class="he" style="font-size:0.9rem;color:#808285;margin-top:6px">${monthLabel} ${year}</div>
+      <div style="height:2px;background:linear-gradient(90deg,transparent,#D9A44E,transparent);margin:14px auto;max-width:300px"></div>
+    </div>
+  </div>
+</div>`;
+};
+
+// ── STUDENT PROFILE — name bold left-aligned above class ─────
+renderStudentProfile = function(sid) {
+  const s = getStudent(sid);
+  if (!s) { $('pageContent').innerHTML = '<div style="padding:40px">Student not found</div>'; return; }
+  const ass = getStudentAssessments(sid);
+  const prov = getProvider(s.providerId);
+  const t = getStudentTrend(sid);
+  const lastA = ass[ass.length - 1];
+  const hs = $('headerSubBreadcrumb');
+  if (hs) hs.innerHTML = ` › <span class="he">${sName(s)}</span>`;
+
+  $('pageContent').innerHTML = `
+<div style="margin-bottom:14px"><button class="btn btn-ghost btn-sm" onclick="navigate('students')">← Back to Students</button></div>
+<div class="student-profile-header">
+  <div style="display:flex;align-items:center;gap:18px">
+    <div class="user-avatar" style="width:64px;height:64px;font-size:1.4rem;flex-shrink:0">${initials(sName(s))}</div>
+    <div style="flex:1;text-align:left">
+      <div class="he" style="font-size:1.5rem;font-weight:900;color:#fff;text-align:right;line-height:1.2">${sName(s)}</div>
+      <div class="he" style="font-size:0.95rem;font-weight:700;color:rgba(255,255,255,0.85);text-align:right;margin-top:2px">${s.class}</div>
+      <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;justify-content:flex-end">
+        <span style="font-size:0.8rem;color:rgba(255,255,255,0.75)"><span class="he">${prov ? prov.name : '—'}</span></span>
+        <span class="he" style="font-size:0.8rem;color:rgba(255,255,255,0.75)">${s.year}</span>
+        ${trendBadge(t)}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0">
+      <button class="btn btn-gold btn-sm" onclick="openAddAssessmentModal('${sid}')">+ Assessment</button>
+      <button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3)" onclick="${lastA ? `showStudentReport('${sid}','${lastA.month}','${lastA.year}')` : "showToast('No assessments yet','warning')"}">📄 Report</button>
+      <button class="btn btn-sm" style="background:rgba(217,164,78,0.3);color:#fff;border:1px solid rgba(217,164,78,0.5)" onclick="showFinalReports('${sid}')">✓ Final Reports</button>
+    </div>
+  </div>
+</div>
+
+<div style="display:flex;border-bottom:2px solid #e8d9b8;margin-bottom:22px">
+  ${['overview','assessments','charts','videos'].map(tab => `
+    <button style="padding:9px 18px;font-size:0.84rem;font-weight:${_profileTab===tab?'700':'600'};color:${_profileTab===tab?'#005778':'#808285'};cursor:pointer;border:none;background:${_profileTab===tab?'#e0eef5':'transparent'};border-bottom:2px solid ${_profileTab===tab?'#005778':'transparent'};margin-bottom:-2px;border-radius:${_profileTab===tab?'8px 8px 0 0':'0'}" onclick="_profileTab='${tab}';renderStudentProfile('${sid}')">${{overview:'Overview',assessments:`Assessments (${ass.length})`,charts:'Charts',videos:'Videos'}[tab]}</button>`).join('')}
+</div>
+<div id="profileContent"></div>`;
+
+  if (_profileTab === 'overview')         renderProfileOverview(sid, s, ass, lastA, prov);
+  else if (_profileTab === 'assessments') renderProfileAssessments(sid, ass);
+  else if (_profileTab === 'charts')      renderProfileCharts(sid, ass);
+  else if (_profileTab === 'videos')      renderStudentVideos12(sid, s);
+};
+
+// ── VIDEOS — all 12 months in order ─────────────────────────
+function renderStudentVideos12(sid, s) {
+  $('profileContent').innerHTML = `
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+  <h3>Reading Videos — <span class="he">${sName(s)}</span></h3>
+  <div style="font-size:0.84rem;color:#808285">Upload one video per month</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px">
+  ${HEB_MONTHS.map(m => {
+    const video = getStudentVideo(sid, m.id, CUR_YEAR);
+    return `<div style="border:1px solid #e8d9b8;border-radius:10px;overflow:hidden">
+      <div style="background:linear-gradient(135deg,#005778,#1a7a9a);padding:10px 14px;color:#fff;display:flex;align-items:center;justify-content:space-between">
+        <span class="he" style="font-weight:800;font-size:0.9rem">${m.label}</span>
+        <span class="he" style="font-size:0.72rem;opacity:0.7">${CUR_YEAR}</span>
+      </div>
+      <div style="padding:12px;background:#fff">
+        ${video
+          ? `<video src="${video.url}" controls style="width:100%;border-radius:6px;max-height:130px;background:#000"></video>
+             <div style="font-size:0.7rem;color:#808285;margin-top:5px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${video.name}</div>
+             <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:7px;font-size:0.75rem" onclick="uploadVideoFor('${sid}','${m.id}','${CUR_YEAR}')">Replace</button>`
+          : `<div style="border:2px dashed #b0cfe0;border-radius:7px;padding:18px;text-align:center;cursor:pointer;background:#e0eef5;transition:all 0.2s" onclick="uploadVideoFor('${sid}','${m.id}','${CUR_YEAR}')" onmouseenter="this.style.background='#c8dff0'" onmouseleave="this.style.background='#e0eef5'">
+               <div style="font-size:1.6rem;margin-bottom:4px">🎥</div>
+               <div style="font-size:0.78rem;color:#005778;font-weight:600">Upload</div>
+             </div>`}
+      </div>
+    </div>`;
+  }).join('')}
+</div>`;
+}
+
+// ── CSV IMPORT ───────────────────────────────────────────────
+let _csvData = [];
+
+function downloadCSVTemplate(type) {
+  let csv, filename;
+  if (type === 'students') {
+    csv = 'firstName,lastName,class,providerName,year\nיוסף,כהן,א׳,כיתה א׳,תשפ״ו\nמנחם,לוי,ב׳,כיתה ב׳,תשפ״ו';
+    filename = 'students_template.csv';
+  } else {
+    csv = 'name,directorName,directorEmail\nכיתה א׳,הרב משה לוי,moshe@school.edu\nכיתה ב׳,הרב אברהם כהן,avraham@school.edu';
+    filename = 'classes_template.csv';
+  }
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  showToast(`${filename} downloaded`, 'success');
+}
+
+function previewCSV(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const text = e.target.result.replace(/^\uFEFF/, '');
+    const lines = text.trim().split('\n');
+    const headers = lines[0].split(',').map(h => h.trim());
+    _csvData = lines.slice(1).map(line => {
+      const vals = line.split(',').map(v => v.trim());
+      const obj = {};
+      headers.forEach((h, i) => obj[h] = vals[i] || '');
+      return obj;
+    }).filter(row => Object.values(row).some(v => v));
+
+    const preview = $('csvPreview');
+    if (!preview) return;
+    preview.innerHTML = `
+      <div style="font-size:0.84rem;font-weight:700;color:#005778;margin-bottom:8px">${_csvData.length} rows found</div>
+      <div style="overflow-x:auto;max-height:200px;border:1px solid #e8d9b8;border-radius:8px">
+        <table style="width:100%;border-collapse:collapse;font-size:0.8rem">
+          <thead><tr>${headers.map(h=>`<th style="background:#005778;color:#fff;padding:7px 10px;text-align:right">${h}</th>`).join('')}</tr></thead>
+          <tbody>${_csvData.slice(0,5).map((row,i)=>`<tr style="background:${i%2===0?'#fff':'#f8f9fa'}">${headers.map(h=>`<td style="padding:6px 10px;border-bottom:1px solid #e8d9b8;text-align:right" class="he">${row[h]||''}</td>`).join('')}</tr>`).join('')}</tbody>
+        </table>
+      </div>
+      ${_csvData.length > 5 ? `<div style="font-size:0.76rem;color:#808285;margin-top:6px">...and ${_csvData.length-5} more rows</div>` : ''}`;
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function importCSV() {
+  const type = $('csvType')?.value || 'students';
+  if (!_csvData.length) { showToast('No data to import', 'warning'); return; }
+  let imported = 0, skipped = 0;
+
+  if (type === 'students') {
+    _csvData.forEach(row => {
+      if (!row.firstName || !row.lastName) { skipped++; return; }
+      // Find or create provider by name
+      let prov = PROVIDERS.find(p => p.name === row.providerName);
+      if (!prov && row.providerName) {
+        prov = { id: genId('p'), name: row.providerName, director: '', email: '', city: '', phone: '', classes: [row.class || 'א׳'] };
+        PROVIDERS.push(prov);
+      }
+      const pid = prov ? prov.id : (PROVIDERS[0]?.id || 'p1');
+      STUDENTS.push({ id: genId('s'), firstName: row.firstName, lastName: row.lastName, providerId: pid, class: row.class || 'א׳', year: row.year || CUR_YEAR, status: 'active', notes: '' });
+      imported++;
+    });
+    const sb = $('studentsBadge'); if (sb) sb.textContent = STUDENTS.length;
+  } else {
+    _csvData.forEach(row => {
+      if (!row.name) { skipped++; return; }
+      PROVIDERS.push({ id: genId('p'), name: row.name, director: row.directorName || '', email: row.directorEmail || '', city: '', phone: '', classes: ['א׳','ב׳'] });
+      imported++;
+    });
+    const pb = $('providersBadge'); if (pb) pb.textContent = PROVIDERS.length;
+  }
+
+  closeModal('csvImportModal');
+  showToast(`Imported ${imported} ${type} (${skipped} skipped)`, 'success');
+  _csvData = [];
+  if (_page === 'students') renderStudents();
+  else if (_page === 'providers') navigate('providers');
+}
+
+function openCSVImport() { openModal('csvImportModal'); }
+
+// ── BULK WORKSHEET — all providers at once ───────────────────
+function generateAllWorksheets() {
+  const month = $('wsMonth')?.value || _wsMonth;
+  const year  = $('wsYear')?.value  || CUR_YEAR;
+  const monthLabel = getMonthLabel(month);
+
+  const allHTML = PROVIDERS.map(p => {
+    const ss = getProviderStudents(p.id);
+    if (!ss.length) return '';
+    return `
+<div style="page-break-after:always;font-family:'Frank Ruhl Libre','Heebo',serif;direction:rtl;padding:20px">
+  <div style="background:linear-gradient(135deg,#005778,#1a7a9a);padding:12px 20px;border-radius:8px 8px 0 0;display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:0">
+    <span style="color:#D9A44E;font-size:1.5rem">❧</span>
+    <img src="assets/logo.png" style="width:52px;height:52px;object-fit:contain;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.3))" onerror="this.style.display='none'">
+    <div style="text-align:center;color:#fff"><div style="font-size:0.65rem;color:rgba(255,255,255,0.7)">מערכת הקריאה</div><div style="font-size:1rem;font-weight:900">מחדדים בפיך</div></div>
+    <span style="color:#D9A44E;font-size:1.5rem">❦</span>
+  </div>
+  <div style="height:3px;background:linear-gradient(90deg,transparent,#D9A44E,transparent);margin-bottom:12px"></div>
+  <div style="text-align:center;margin-bottom:12px">
+    <div style="font-size:1rem;font-weight:800;color:#005778">גיליון הערכה — <span class="he">${p.name}</span></div>
+    <div style="font-size:0.8rem;color:#808285;margin-top:3px"><span class="he">${monthLabel} ${year}</span></div>
+  </div>
+  <table style="width:100%;border-collapse:collapse;direction:rtl;font-size:0.8rem">
+    <thead>
+      <tr>
+        <th style="background:#005778;color:#fff;padding:8px 10px;text-align:right;min-width:120px">שם תלמיד</th>
+        <th style="background:#005778;color:#fff;padding:8px 6px;text-align:center">כיתה</th>
+        ${CATS.map(cat => cat.hasMistakes
+          ? `<th colspan="2" style="background:#005778;color:#fff;padding:8px 6px;text-align:center;border-right:2px solid rgba(255,255,255,0.3)"><span class="he" style="font-size:0.72rem">${cat.label}</span></th>`
+          : `<th style="background:#005778;color:#fff;padding:8px 6px;text-align:center;border-right:2px solid rgba(255,255,255,0.3)"><span class="he" style="font-size:0.72rem">${cat.label}</span></th>`
+        ).join('')}
+        <th style="background:#005778;color:#fff;padding:8px 6px;text-align:right">הערות</th>
+      </tr>
+      <tr style="background:#1a7a9a">
+        <th></th><th></th>
+        ${CATS.map(cat => cat.hasMistakes
+          ? `<th style="color:#a8e0e0;font-size:0.62rem;padding:4px;text-align:center">נכון</th><th style="color:#ffaaaa;font-size:0.62rem;padding:4px;text-align:center;border-right:2px solid rgba(255,255,255,0.15)">שגיאות</th>`
+          : `<th style="color:#a8e0e0;font-size:0.62rem;padding:4px;text-align:center;border-right:2px solid rgba(255,255,255,0.15)">ציון</th>`
+        ).join('')}
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      ${ss.map((s, i) => `
+        <tr style="border-bottom:1px solid #e8d9b8;background:${i%2===0?'#fff':'#f8f9fa'}">
+          <td class="he" style="padding:12px 10px;font-weight:600;text-align:right">${sName(s)}</td>
+          <td style="padding:12px 6px;text-align:center">${s.class}</td>
+          ${CATS.map(cat => cat.hasMistakes
+            ? `<td style="padding:12px 6px;min-width:40px;background:#fafaf8;border-right:1px solid #eee"></td><td style="padding:12px 6px;min-width:40px;background:#fafaf8;border-right:2px solid #ddd"></td>`
+            : `<td style="padding:12px 6px;min-width:55px;background:#fafaf8;border-right:2px solid #ddd"></td>`
+          ).join('')}
+          <td style="padding:12px 6px;min-width:90px"></td>
+        </tr>`).join('')}
+    </tbody>
+  </table>
+  <div style="margin-top:14px;display:flex;justify-content:space-between;font-size:0.72rem;color:#808285;border-top:1px solid #e8d9b8;padding-top:8px">
+    <span>חתימת מורה: ___________________</span>
+    <span>תאריך: ___________________</span>
+    <span>KriahTrack</span>
+  </div>
+</div>`;
+  }).join('');
+
+  // Download as HTML (PDF would require server-side for multi-page)
+  const blob = new Blob([`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{margin:0;padding:0;font-family:'Frank Ruhl Libre',serif}@page{size:landscape;margin:8mm}@media print{.page-break{page-break-after:always}}</style></head><body>${allHTML}</body></html>`], {type:'text/html'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `all_worksheets_${monthLabel}_${year}.html`;
+  a.click();
+  showToast(`All ${PROVIDERS.length} worksheets downloaded`, 'success');
+}
+
+// ── BACKUP — single JSON file ────────────────────────────────
+const _origDownloadBackup = typeof API !== 'undefined' ? API.downloadBackup : null;
+function downloadBackup() {
+  const data = {
+    exportedAt: new Date().toISOString(),
+    version: '2.0',
+    school: SCHOOL,
+    kriahDirector: KRIAH_DIRECTOR,
+    providers: PROVIDERS,
+    students: STUDENTS,
+    assessments: ASSESSMENTS,
+    reportFinals: REPORT_FINALS,
+    ocrImports: OCR_IMPORTS,
+    systemLog: SYS_LOGS.slice(0, 100),
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const date = new Date().toISOString().slice(0,10);
+  a.download = `KriahTrack_backup_${date}.json`;
+  a.click();
+  showToast('Backup downloaded as single JSON file', 'success');
+}
+
+// Override header backup button
+(function fixBackupBtn() {
+  const btn = document.querySelector('.header-btn[onclick*="downloadBackup"]');
+  if (btn) btn.setAttribute('onclick', 'downloadBackup()');
+})();
+
+// ── WORKSHEETS PAGE — add bulk generate + CSV import ─────────
+const _origRenderWorksheets2 = renderWorksheets;
+renderWorksheets = function() {
+  $('pageContent').innerHTML = `
+<div class="page-header">
+  <div><h1 class="page-title">Worksheets</h1><p class="page-subtitle">Generate handwriting grading sheets — landscape PDF</p></div>
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-outline btn-sm" onclick="openCSVImport()">📄 Import CSV</button>
+  </div>
+</div>
+<div class="card mb-6">
+  <div class="card-header"><span class="card-title">Worksheet Settings</span></div>
+  <div class="card-body">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
+      <div class="form-group"><label class="form-label">Class</label>
+        <select class="form-control" id="wsProv" onchange="_wsProv=this.value">
+          <option value="">All Classes</option>
+          ${PROVIDERS.map(p=>`<option value="${p.id}" ${_wsProv===p.id?'selected':''}>${p.name}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Hebrew Month *</label>
+        <select class="form-control he" id="wsMonth" onchange="_wsMonth=this.value">
+          ${HEB_MONTHS.map(m=>`<option value="${m.id}" ${_wsMonth===m.id?'selected':''}>${m.label}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Hebrew Year</label>
+        <select class="form-control he" id="wsYear" onchange="_wsYear=this.value">
+          ${yearSelect(CUR_YEAR)}
+        </select>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="genWorksheet()">Generate Sheet</button>
+      <button class="btn btn-gold" onclick="downloadWorksheet()">⬇ Download PDF</button>
+      <button class="btn btn-outline" onclick="printWorksheet()">🖨 Print (Landscape)</button>
+      <button class="btn btn-sm" style="background:#e0eef5;color:#005778;border:1px solid #b0cfe0" onclick="generateAllWorksheets()">📋 All Classes PDF</button>
+    </div>
+  </div>
+</div>
+<div id="wsPreview"></div>`;
+};
+
+// ── STUDENTS PAGE — add CSV import button ────────────────────
+const _origRenderStudents2 = renderStudents;
+renderStudents = function() {
+  _origRenderStudents2();
+  // Add CSV button to page header
+  setTimeout(() => {
+    const header = $('pageContent')?.querySelector('.page-header > div:last-child');
+    if (header && !header.querySelector('[onclick*="csvImport"]')) {
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-outline btn-sm';
+      btn.setAttribute('onclick', 'openCSVImport()');
+      btn.textContent = '📄 Import CSV';
+      header.insertBefore(btn, header.firstChild);
+    }
+  }, 50);
+};
+
+// ── PROVIDER/CLASS — add CSV import ─────────────────────────
+const _origRenderProviders2 = renderProviders;
+renderProviders = function() {
+  _origRenderProviders2();
+  setTimeout(() => {
+    const header = $('pageContent')?.querySelector('.page-header > div:last-child');
+    if (header && !header.querySelector('[onclick*="csvImport"]')) {
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-outline btn-sm';
+      btn.setAttribute('onclick', 'openCSVImport()');
+      btn.textContent = '📄 Import CSV';
+      header.insertBefore(btn, header.firstChild);
+    }
+  }, 50);
+};
+
+// ── FIX REPORT MODAL FOOTER ──────────────────────────────────
+setTimeout(() => {
+  const footer = document.querySelector('#reportPreviewModal .modal-footer');
+  if (footer) {
+    footer.innerHTML = `
+      <button class="btn btn-primary" onclick="printReport()">🖨 Print</button>
+      <button class="btn btn-gold" onclick="if(window._currentReportMeta){downloadReport(window._currentReportMeta.sid,window._currentReportMeta.month,window._currentReportMeta.year)}">⬇ Download PDF</button>
+      <button class="btn btn-ghost" onclick="closeModal('reportPreviewModal')">Close</button>`;
+  }
+}, 200);
