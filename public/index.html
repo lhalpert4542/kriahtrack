@@ -4,12 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>KriahTrack</title>
-
-<!-- Biennale via Google Fonts closest match (Cormorant Garamond for display, Plus Jakarta Sans for UI) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Cormorant+Garamond:wght@400;500;600;700&display=swap" rel="stylesheet">
-
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Frank+Ruhl+Libre:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link href="styles.css" rel="stylesheet">
 </head>
@@ -19,6 +16,7 @@
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 
 <div class="app-shell" id="appShell">
+
   <!-- SIDEBAR -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-logo">
@@ -28,6 +26,7 @@
         <div class="app-subtitle">Kriah Progress System</div>
       </div>
     </div>
+
     <nav class="sidebar-nav">
       <div class="nav-section-label">Main</div>
       <div class="nav-item active" onclick="navigate('dashboard')" data-page="dashboard">
@@ -38,17 +37,19 @@
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
         Analytics
       </div>
+
       <div class="nav-section-label">Management</div>
       <div class="nav-item" onclick="navigate('students')" data-page="students">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         Students
-        <span class="nav-badge" id="studentsBadge">—</span>
+        <span class="nav-badge" id="studentsBadge">12</span>
       </div>
       <div class="nav-item" onclick="navigate('providers')" data-page="providers">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
         Providers
-        <span class="nav-badge" id="providersBadge">—</span>
+        <span class="nav-badge" id="providersBadge">4</span>
       </div>
+
       <div class="nav-section-label">Tools</div>
       <div class="nav-item" onclick="navigate('worksheets')" data-page="worksheets">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
@@ -63,16 +64,18 @@
         Upload Worksheet
         <span class="nav-badge" style="background:var(--gold-500)">OCR</span>
       </div>
+
       <div class="nav-section-label">System</div>
       <div class="nav-item" onclick="navigate('admin')" data-page="admin">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M20 12h2M2 12h2M17.66 17.66l-1.41-1.41M6.34 17.66l1.41-1.41"/></svg>
         Admin Panel
       </div>
     </nav>
+
     <div class="sidebar-footer">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:0 4px">
         <div id="serverStatusDot" style="width:8px;height:8px;border-radius:50%;background:var(--gold-400);flex-shrink:0;transition:background 0.3s"></div>
-        <span id="serverStatusText" style="font-size:0.68rem;color:var(--teal-300);letter-spacing:0.3px">Syncing...</span>
+        <span id="serverStatusText" style="font-size:0.68rem;color:var(--teal-300);letter-spacing:0.3px">Demo mode</span>
       </div>
       <div class="sidebar-user">
         <div class="user-avatar">SA</div>
@@ -95,7 +98,7 @@
         <span id="headerSubBreadcrumb" style="color:var(--text-muted);font-size:0.85rem"></span>
       </div>
       <div class="header-actions">
-        <div class="date-badge he" id="hebrewDateBadge" style="font-family:var(--font-he)">כ״ו סיון תשפ״ו</div>
+        <div class="date-badge he" id="hebrewDateBadge">כ״ו סיון תשפ״ו</div>
         <button class="header-btn" onclick="navigate('ocr')" title="Upload Worksheet">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         </button>
@@ -108,13 +111,6 @@
         </button>
       </div>
     </header>
-
-    <!-- Sync banner — shows while loading real data in background -->
-    <div id="syncBanner" style="background:linear-gradient(90deg,var(--teal-800),var(--teal-700));color:#fff;padding:8px 28px;font-size:0.78rem;display:none;align-items:center;gap:10px;font-family:var(--font-en)">
-      <div class="spinner" style="width:14px;height:14px;border-width:2px;border-color:rgba(255,255,255,0.3);border-top-color:#fff;flex-shrink:0"></div>
-      <span id="syncBannerMsg">Syncing with server...</span>
-      <button onclick="document.getElementById('syncBanner').style.display='none'" style="margin-left:auto;background:none;border:none;color:rgba(255,255,255,0.6);cursor:pointer;font-size:1rem;line-height:1">✕</button>
-    </div>
 
     <div class="page-content animate-fade" id="pageContent"></div>
   </main>
@@ -134,7 +130,7 @@
         <div class="form-group"><label class="form-label">Class *</label><select class="form-control" id="newStudentClass"><option value="">Select class...</option></select></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">School Year</label><input type="text" class="form-control" id="newStudentYear" value="תשפ״ו"></div>
+        <div class="form-group"><label class="form-label">School Year</label><input type="text" class="form-control he" id="newStudentYear" value="תשפ״ו"></div>
         <div class="form-group"><label class="form-label">Notes</label><input type="text" class="form-control" id="newStudentNotes" placeholder="Optional notes"></div>
       </div>
     </div>
@@ -150,8 +146,8 @@
     <div class="modal-header"><span class="modal-title" id="assessmentModalTitle">Add Assessment</span><button class="modal-close" onclick="closeModal('addAssessmentModal')">✕</button></div>
     <div class="modal-body">
       <div class="form-row">
-        <div class="form-group"><label class="form-label">Hebrew Month *</label><select class="form-control" id="assessmentMonth"><option value="">Select month...</option></select></div>
-        <div class="form-group"><label class="form-label">Hebrew Year</label><input type="text" class="form-control" id="assessmentYear" value="תשפ״ו" readonly></div>
+        <div class="form-group"><label class="form-label">Hebrew Month *</label><select class="form-control he" id="assessmentMonth"><option value="">Select month...</option></select></div>
+        <div class="form-group"><label class="form-label">Hebrew Year</label><input type="text" class="form-control he" id="assessmentYear" value="תשפ״ו" readonly></div>
       </div>
       <div class="divider"></div>
       <h4 style="margin-bottom:12px;color:var(--teal-800)">Category Scores — No overall score</h4>
