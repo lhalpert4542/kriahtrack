@@ -1,5 +1,11 @@
 // KriahTrack — Part 1: Constants & Data
-const CATS=[{id:'otiyot',label:'אותיות',color:'#005778'},{id:'ot_nekuda',label:'אות + נקודה',color:'#D9A44E'},{id:'ot_nekuda_ot',label:'אות + נקודה + אות',color:'#808285'},{id:'milim',label:'מילים',color:'#1a7a9a'},{id:'tehilim',label:'תהילים',color:'#b8832e'}];
+const CATS=[
+  {id:'otiyot',       label:'אותיות',           color:'#005778', hasMistakes:true},
+  {id:'ot_nekuda',    label:'אות + נקודה',       color:'#D9A44E', hasMistakes:true},
+  {id:'ot_nekuda_ot', label:'אות + נקודה + אות', color:'#808285', hasMistakes:true},
+  {id:'milim',        label:'מילים',             color:'#1a7a9a', hasMistakes:false},
+  {id:'tehilim',      label:'תהילים',            color:'#b8832e', hasMistakes:false},
+];
 const HEB_MONTHS=[{id:'tishrei',label:'תשרי',order:1},{id:'cheshvan',label:'חשון',order:2},{id:'kislev',label:'כסלו',order:3},{id:'tevet',label:'טבת',order:4},{id:'shvat',label:'שבט',order:5},{id:'adar',label:'אדר',order:6},{id:'nisan',label:'ניסן',order:7},{id:'iyar',label:'אייר',order:8},{id:'sivan',label:'סיון',order:9},{id:'tamuz',label:'תמוז',order:10},{id:'av',label:'אב',order:11},{id:'elul',label:'אלול',order:12}];
 const CUR_YEAR='תשפ״ו',CUR_MONTH='sivan',HEB_TODAY='כ״ו סיון תשפ״ו';
 let PROVIDERS=[{id:'p1',name:'בית ספר אהבת תורה',director:'הרב משה לוי',email:'moshe@ahavatorah.edu',city:'בני ברק',classes:['א׳','ב׳','ג׳']},{id:'p2',name:'תלמוד תורה אור החיים',director:'הרב אברהם כהן',email:'avraham@orchaim.edu',city:'ירושלים',classes:['א׳','ב׳']},{id:'p3',name:'ישיבה קטנה בית יעקב',director:'הרב יצחק שפירא',email:'yitzchak@beitya.edu',city:'אשדוד',classes:['א׳','ב׳','ג׳','ד׳']},{id:'p4',name:'חדר מרכזי ברסלב',director:'הרב נחמן גרין',email:'nachman@breslov.edu',city:'צפת',classes:['א׳','ב׳']}];
@@ -238,7 +244,7 @@ function renderProviderProfile(pid){
 
 let _wsProv='',_wsMonth=CUR_MONTH;
 function renderWorksheets(){
-  $('pageContent').innerHTML=`<div class="page-header"><div><h1 class="page-title">Worksheets</h1><p class="page-subtitle">Generate handwriting grading sheets by provider and month</p></div></div><div class="card mb-6"><div class="card-header"><span class="card-title">Worksheet Settings</span></div><div class="card-body"><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px"><div class="form-group"><label class="form-label">Provider *</label><select class="form-control" id="wsProv" onchange="_wsProv=this.value"><option value="">Select provider...</option>${PROVIDERS.map(p=>`<option value="${p.id}" ${_wsProv===p.id?'selected':''}>${p.name}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">Hebrew Month *</label><select class="form-control he" id="wsMonth" onchange="_wsMonth=this.value">${HEB_MONTHS.map(m=>`<option value="${m.id}" ${_wsMonth===m.id?'selected':''}>${m.label}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">Hebrew Year</label><input type="text" class="form-control he" value="${CUR_YEAR}" readonly></div></div><div style="display:flex;gap:10px;margin-top:8px"><button class="btn btn-primary" onclick="genWorksheet()">Generate Sheet</button><button class="btn btn-gold" onclick="window.print()">Print</button></div></div></div><div id="wsPreview"></div>`;
+  $('pageContent').innerHTML=`<div class="page-header"><div><h1 class="page-title">Worksheets</h1><p class="page-subtitle">Generate handwriting grading sheets by provider and month</p></div></div><div class="card mb-6"><div class="card-header"><span class="card-title">Worksheet Settings</span></div><div class="card-body"><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px"><div class="form-group"><label class="form-label">Provider *</label><select class="form-control" id="wsProv" onchange="_wsProv=this.value"><option value="">Select provider...</option>${PROVIDERS.map(p=>`<option value="${p.id}" ${_wsProv===p.id?'selected':''}>${p.name}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">Hebrew Month *</label><select class="form-control he" id="wsMonth" onchange="_wsMonth=this.value">${HEB_MONTHS.map(m=>`<option value="${m.id}" ${_wsMonth===m.id?'selected':''}>${m.label}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">Hebrew Year</label><input type="text" class="form-control he" value="${CUR_YEAR}" readonly></div></div><div style="display:flex;gap:10px;margin-top:8px"><button class="btn btn-primary" onclick="genWorksheet()">Generate Sheet</button><button class="btn btn-gold" onclick="printWorksheet()">Print (Landscape)</button></div></div></div><div id="wsPreview"></div>`;
 }
 function genWorksheet(){
   _wsProv=document.getElementById('wsProv')?.value||_wsProv;_wsMonth=document.getElementById('wsMonth')?.value||_wsMonth;
@@ -365,3 +371,307 @@ document.addEventListener('DOMContentLoaded',()=>{
   // Background server sync
   setTimeout(async()=>{try{const[providers,students,assessments]=await Promise.all([API.getProviders(),API.getStudents(),API.getAssessments()]);PROVIDERS.length=0;providers.forEach(p=>PROVIDERS.push(p));STUDENTS.length=0;students.forEach(s=>STUDENTS.push({...s,firstName:s.first_name||s.firstName||'',lastName:s.last_name||s.lastName||'',providerId:s.provider_id||s.providerId||''}));ASSESSMENTS.length=0;assessments.forEach(a=>{if(a.categories)ASSESSMENTS.push({...a,studentId:a.student_id||a.studentId,providerId:a.provider_id||a.providerId});else ASSESSMENTS.push({...a,studentId:a.student_id||a.studentId,providerId:a.provider_id||a.providerId,categories:{otiyot:{correct:a.otiyot_correct||0,mistakes:a.otiyot_mistakes||0},ot_nekuda:{correct:a.ot_nekuda_correct||0,mistakes:a.ot_nekuda_mistakes||0},ot_nekuda_ot:{correct:a.ot_nekuda_ot_correct||0,mistakes:a.ot_nekuda_ot_mistakes||0},milim:{correct:a.milim_correct||0,mistakes:a.milim_mistakes||0},tehilim:{correct:a.tehilim_correct||0,mistakes:a.tehilim_mistakes||0}}});});const dot=$('serverStatusDot'),txt=$('serverStatusText');if(dot)dot.style.background='#1a6038';if(txt)txt.textContent='Connected';if(sb)sb.textContent=STUDENTS.length;if(pb)pb.textContent=PROVIDERS.length;navigate(_page,_params);}catch(e){console.warn('[KT] Using demo data');}},1500);
 });
+
+// ============================================================
+// OVERRIDES — RTL tables, correct report/worksheet layout
+// ============================================================
+
+// Override catGrid to respect hasMistakes flag
+function catGrid(cats, data) {
+  return `<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;direction:rtl">
+    ${cats.map(cat => {
+      const correct  = data?.categories[cat.id]?.correct  || 0;
+      const mistakes = data?.categories[cat.id]?.mistakes || 0;
+      return `<div style="background:#f8f9fa;border:1px solid #e8d9b8;border-top:3px solid ${cat.color};border-radius:8px;padding:10px;text-align:center">
+        <div class="he" style="font-size:0.65rem;font-weight:700;color:${cat.color};margin-bottom:8px">${cat.label}</div>
+        <div style="font-size:1.3rem;font-weight:900;color:#005778">${correct}</div>
+        ${cat.hasMistakes ? `<div style="font-size:0.7rem;color:#9a1c1c;font-weight:700;margin-top:2px">${mistakes} mistakes</div>` : ''}
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+// ============================================================
+// REPORT — exact format matching attached image
+// ============================================================
+function showStudentReport(sid) {
+  const s = getStudent(sid);
+  const allAss = getStudentAssessments(sid);
+  const prov = getProvider(s.providerId);
+  if (!allAss.length) { showToast('No assessments for report', 'warning'); return; }
+  const lastA = allAss[allAss.length - 1];
+  const monthLabel = getMonthLabel(lastA.month);
+
+  // YTD assessments from תשרי onwards (all months in order)
+  const ytdAss = allAss; // already sorted from תשרי
+
+  // AI note — Yiddish or English only
+  const t = getStudentTrend(sid);
+  const noteEn = t === 'up'
+    ? `Strong progress this month. Continues to build fluency and accuracy.`
+    : t === 'down'
+    ? `Some challenges this month. Additional support recommended to reinforce skills.`
+    : `Steady performance this month. Maintaining consistent reading skills.`;
+  const noteYi = t === 'up'
+    ? `${s.firstName} האט זיך שטארק פארבעסערט דעם חודש. ער לערנט מיט גרויס פלייס.`
+    : t === 'down'
+    ? `${s.firstName} האט עטוואס שווערע צייטן דעם חודש. מיר וועלן אים מער העלפן.`
+    : `${s.firstName} האלט זיין ניוואו. ער לערנט גוט.`;
+
+  $('reportPreviewBody').innerHTML = `
+<div style="font-family:'Frank Ruhl Libre','Heebo',serif;direction:rtl;max-width:700px;margin:0 auto;background:#fff">
+
+  <!-- LETTERHEAD BANNER -->
+  <div style="background:linear-gradient(135deg,#005778,#1a7a9a);padding:0;margin-bottom:0;position:relative;overflow:hidden">
+    <div style="display:flex;align-items:center;justify-content:center;padding:16px 24px;gap:20px">
+      <!-- Left flourish -->
+      <div style="color:#D9A44E;font-size:2rem;opacity:0.8">❧</div>
+      <!-- Logo + text center -->
+      <div style="text-align:center;flex:1">
+        <div style="display:flex;align-items:center;justify-content:center;gap:16px">
+          <img src="assets/logo.png" style="width:72px;height:72px;object-fit:contain;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.3))" onerror="this.style.display='none'">
+          <div>
+            <div style="font-size:0.75rem;color:rgba(255,255,255,0.8);letter-spacing:1px">מערכת הקריאה</div>
+            <div style="font-size:1.4rem;font-weight:900;color:#fff;letter-spacing:0.5px">מחדדים בפיך</div>
+            <div style="font-size:0.65rem;color:rgba(255,255,255,0.7);margin-top:2px">איחוד מוסדות החינוך</div>
+          </div>
+        </div>
+      </div>
+      <!-- Right flourish -->
+      <div style="color:#D9A44E;font-size:2rem;opacity:0.8">❦</div>
+    </div>
+    <!-- Gold bottom line -->
+    <div style="height:3px;background:linear-gradient(90deg,transparent,#D9A44E,transparent)"></div>
+  </div>
+
+  <!-- DATE & STUDENT -->
+  <div style="padding:20px 28px 10px;text-align:center;border-bottom:1px solid #e8d9b8">
+    <div style="font-size:0.85rem;color:#808285;margin-bottom:6px"><span class="he">${monthLabel} ${lastA.year}</span></div>
+    <div style="font-size:1.1rem;color:#333;line-height:1.7">
+      <span class="he">לכבוד התלמיד היקר</span>
+      <span class="he" style="font-size:1.3rem;font-weight:900;color:#005778;display:block;margin-top:4px">${s.firstName} ${s.lastName}</span>
+    </div>
+    <div style="font-size:0.85rem;color:#555;margin-top:6px;direction:rtl">
+      <span class="he">מזל טוב על תוצאות הקריאה החודשיות שלך!</span>
+    </div>
+  </div>
+
+  <!-- CURRENT MONTH SCORES — teal boxes -->
+  <div style="padding:18px 28px">
+    <div style="font-size:0.8rem;font-weight:700;color:#808285;text-align:center;margin-bottom:12px;text-transform:uppercase;letter-spacing:1px">
+      ${monthLabel} ${lastA.year} — Results
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;direction:rtl">
+      ${CATS.map(cat => {
+        const correct  = lastA.categories[cat.id]?.correct  || 0;
+        const mistakes = lastA.categories[cat.id]?.mistakes || 0;
+        return `<div style="background:#005778;border-radius:10px;padding:14px 8px;text-align:center;color:#fff">
+          <div class="he" style="font-size:0.62rem;font-weight:700;color:rgba(255,255,255,0.8);margin-bottom:8px;line-height:1.3">${cat.label}</div>
+          <div style="font-size:1.8rem;font-weight:900;color:#fff;line-height:1">${correct}</div>
+          ${cat.hasMistakes ? `<div style="font-size:0.65rem;color:rgba(255,200,200,0.9);margin-top:4px">${mistakes} err.</div>` : `<div style="font-size:0.65rem;color:rgba(255,255,255,0.5);margin-top:4px">—</div>`}
+        </div>`;
+      }).join('')}
+    </div>
+  </div>
+
+  <!-- YTD PROGRESS TABLE — from תשרי -->
+  <div style="padding:0 28px 18px">
+    <div style="font-size:0.8rem;font-weight:700;color:#808285;margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;text-align:center">
+      Year-to-Date Progress — <span class="he">${CUR_YEAR}</span>
+    </div>
+    <table style="width:100%;border-collapse:collapse;direction:rtl;font-size:0.82rem">
+      <thead>
+        <tr style="background:#005778;color:#fff">
+          <th style="padding:9px 10px;text-align:right;font-weight:700;border-radius:0 6px 0 0">חודש</th>
+          ${CATS.map(cat => `<th style="padding:9px 8px;text-align:center;font-weight:700;border-right:1px solid rgba(255,255,255,0.2)">
+            <span class="he" style="font-size:0.72rem">${cat.label}</span>
+          </th>`).join('')}
+        </tr>
+      </thead>
+      <tbody>
+        ${ytdAss.map((a, i) => `
+          <tr style="background:${i % 2 === 0 ? '#fff' : '#f8f9fa'};${a.month === lastA.month ? 'font-weight:700;background:#e0eef5;' : ''}">
+            <td style="padding:8px 10px;text-align:right;border-bottom:1px solid #e8d9b8">
+              <span class="he" style="font-weight:${a.month === lastA.month ? '800' : '500'};color:${a.month === lastA.month ? '#005778' : '#333'}">${getMonthLabel(a.month)}</span>
+              ${a.month === lastA.month ? '<span style="font-size:0.6rem;background:#005778;color:#fff;padding:1px 5px;border-radius:10px;margin-right:4px">עכשיו</span>' : ''}
+            </td>
+            ${CATS.map(cat => {
+              const correct  = a.categories[cat.id]?.correct  || 0;
+              const mistakes = a.categories[cat.id]?.mistakes || 0;
+              return `<td style="padding:8px;text-align:center;border-bottom:1px solid #e8d9b8;border-right:1px solid #e8d9b8">
+                <span style="font-weight:700;color:#005778;font-size:0.9rem">${correct}</span>
+                ${cat.hasMistakes && mistakes > 0 ? `<span style="font-size:0.65rem;color:#9a1c1c;display:block">-${mistakes}</span>` : ''}
+              </td>`;
+            }).join('')}
+          </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- NOTES -->
+  <div style="padding:0 28px 18px">
+    <div style="border:1px solid #e8d9b8;border-radius:10px;overflow:hidden">
+      <div style="background:#005778;padding:8px 14px">
+        <span style="color:#fff;font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px">Teacher's Note</span>
+      </div>
+      <div style="padding:14px;background:#fdf8f0">
+        <div style="font-size:0.85rem;color:#333;line-height:1.7;margin-bottom:8px">${noteEn}</div>
+        <div class="he" style="font-size:0.85rem;color:#444;line-height:1.8;border-top:1px solid #e8d9b8;padding-top:8px;margin-top:8px">${noteYi}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROVIDER -->
+  <div style="padding:0 28px 24px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #e8d9b8;margin-top:4px;padding-top:14px">
+    <div style="font-size:0.8rem;color:#808285">
+      <span style="font-weight:700;text-transform:uppercase;letter-spacing:0.5px">Provider:</span>
+      <span class="he" style="font-weight:700;color:#005778;margin-right:6px">${prov ? prov.name : '—'}</span>
+    </div>
+    <div style="font-size:0.8rem;color:#808285">
+      <span style="font-weight:700;text-transform:uppercase;letter-spacing:0.5px">Director:</span>
+      <span class="he" style="font-weight:700;color:#333;margin-right:6px">${prov ? prov.director : '—'}</span>
+    </div>
+  </div>
+
+  <!-- BOTTOM BANNER -->
+  <div style="background:linear-gradient(135deg,#005778,#1a7a9a);height:8px;border-radius:0 0 8px 8px"></div>
+</div>`;
+  openModal('reportPreviewModal');
+}
+
+// ============================================================
+// WORKSHEET — landscape, logo header, RTL, no mistakes for מילים/תהילים
+// ============================================================
+function genWorksheet() {
+  _wsProv = document.getElementById('wsProv')?.value || _wsProv;
+  _wsMonth = document.getElementById('wsMonth')?.value || _wsMonth;
+  if (!_wsProv || !_wsMonth) { showToast('Please select provider and month', 'warning'); return; }
+  const p = getProvider(_wsProv), ss = getProviderStudents(_wsProv);
+  if (!ss.length) { showToast('No students for this provider', 'warning'); return; }
+  const monthLabel = getMonthLabel(_wsMonth);
+
+  $('wsPreview').innerHTML = `
+<div id="worksheetDoc" style="background:#fff;padding:20px;font-family:'Frank Ruhl Libre','Heebo',serif;direction:rtl">
+  <!-- LOGO HEADER -->
+  <div style="background:linear-gradient(135deg,#005778,#1a7a9a);padding:12px 20px;border-radius:8px 8px 0 0;display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:0">
+    <div style="color:#D9A44E;font-size:1.5rem">❧</div>
+    <img src="assets/logo.png" style="width:56px;height:56px;object-fit:contain;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.3))" onerror="this.style.display='none'">
+    <div style="text-align:center;color:#fff">
+      <div style="font-size:0.65rem;color:rgba(255,255,255,0.7);letter-spacing:1px">מערכת הקריאה</div>
+      <div style="font-size:1.1rem;font-weight:900">מחדדים בפיך</div>
+    </div>
+    <div style="color:#D9A44E;font-size:1.5rem">❦</div>
+  </div>
+  <div style="height:3px;background:linear-gradient(90deg,transparent,#D9A44E,transparent);margin-bottom:12px"></div>
+
+  <!-- TITLE -->
+  <div style="text-align:center;margin-bottom:14px">
+    <div style="font-size:1rem;font-weight:800;color:#005778">גיליון הערכה — <span class="he">${p.name}</span></div>
+    <div style="font-size:0.8rem;color:#808285;margin-top:3px"><span class="he">${monthLabel} ${CUR_YEAR}</span> | <span class="he">${p.director}</span></div>
+  </div>
+
+  <!-- INSTRUCTIONS -->
+  <div style="background:#e0eef5;border:1px solid #b0cfe0;border-radius:6px;padding:8px 14px;margin-bottom:14px;font-size:0.78rem;color:#005778;text-align:right">
+    <span class="he">הוראות: מלא את הציון לכל קטגוריה עבור כל תלמיד. אין ציון כולל. עבור מילים ותהילים — ציון אחד בלבד.</span>
+  </div>
+
+  <!-- TABLE -->
+  <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;direction:rtl;font-size:0.82rem">
+      <thead>
+        <tr>
+          <th style="background:#005778;color:#fff;padding:9px 12px;text-align:right;min-width:130px;border-radius:0 6px 0 0">שם תלמיד</th>
+          <th style="background:#005778;color:#fff;padding:9px 8px;text-align:center;min-width:50px">כיתה</th>
+          ${CATS.map(cat => cat.hasMistakes
+            ? `<th colspan="2" style="background:#005778;color:#fff;padding:9px 8px;text-align:center;border-right:2px solid rgba(255,255,255,0.3)"><span class="he" style="font-size:0.75rem">${cat.label}</span></th>`
+            : `<th style="background:#005778;color:#fff;padding:9px 8px;text-align:center;border-right:2px solid rgba(255,255,255,0.3)"><span class="he" style="font-size:0.75rem">${cat.label}</span></th>`
+          ).join('')}
+          <th style="background:#005778;color:#fff;padding:9px 8px;text-align:right;min-width:100px">הערות</th>
+        </tr>
+        <tr style="background:#1a7a9a">
+          <th></th><th></th>
+          ${CATS.map(cat => cat.hasMistakes
+            ? `<th style="color:#a8e0e0;font-size:0.65rem;padding:5px;text-align:center">נכון</th><th style="color:#ffaaaa;font-size:0.65rem;padding:5px;text-align:center;border-right:2px solid rgba(255,255,255,0.15)">שגיאות</th>`
+            : `<th style="color:#a8e0e0;font-size:0.65rem;padding:5px;text-align:center;border-right:2px solid rgba(255,255,255,0.15)">ציון</th>`
+          ).join('')}
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${ss.map((s, i) => `
+          <tr style="border-bottom:1px solid #e8d9b8;background:${i % 2 === 0 ? '#fff' : '#f8f9fa'}">
+            <td class="he" style="padding:13px 12px;font-weight:600;text-align:right">${sName(s)}</td>
+            <td style="padding:13px 8px;text-align:center">${s.class}</td>
+            ${CATS.map(cat => cat.hasMistakes
+              ? `<td style="padding:13px 8px;min-width:44px;background:#fafaf8;border-right:1px solid #eee"></td>
+                 <td style="padding:13px 8px;min-width:44px;background:#fafaf8;border-right:2px solid #ddd"></td>`
+              : `<td style="padding:13px 8px;min-width:60px;background:#fafaf8;border-right:2px solid #ddd"></td>`
+            ).join('')}
+            <td style="padding:13px 8px;min-width:100px"></td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- FOOTER -->
+  <div style="margin-top:16px;display:flex;justify-content:space-between;font-size:0.75rem;color:#808285;border-top:1px solid #e8d9b8;padding-top:10px">
+    <span>חתימת מורה: ___________________</span>
+    <span>תאריך: ___________________</span>
+    <span>KriahTrack — מערכת הקריאה</span>
+  </div>
+</div>`;
+}
+
+// ============================================================
+// RTL fix for all tables — patch renderStudents, renderProviders etc.
+// ============================================================
+// Override table headers to be RTL
+const _origRenderStudents = renderStudents;
+renderStudents = function() {
+  _origRenderStudents();
+  // Tables already use direction:rtl via CSS — just ensure th text-align
+  document.querySelectorAll('thead th').forEach(th => {
+    if (!th.style.textAlign) th.style.textAlign = 'right';
+  });
+};
+
+// ============================================================
+// PRINT CSS — landscape for worksheet, portrait for report
+// ============================================================
+(function addPrintCSS() {
+  const style = document.createElement('style');
+  style.textContent = `
+    @media print {
+      body { direction: rtl; }
+      table { direction: rtl; }
+      thead th { text-align: right !important; }
+      tbody td { text-align: right; }
+    }
+    /* Worksheet print = landscape */
+    @media print {
+      #worksheetDoc { page-break-before: always; }
+    }
+    .print-landscape { }
+    .print-portrait  { }
+  `;
+  document.head.appendChild(style);
+})();
+
+// Override window.print for worksheet to use landscape
+const _origPrintWorksheet = window.print;
+function printWorksheet() {
+  const style = document.createElement('style');
+  style.id = 'printOrient';
+  style.textContent = '@page { size: landscape; margin: 10mm; }';
+  document.head.appendChild(style);
+  window.print();
+  setTimeout(() => { const el = document.getElementById('printOrient'); if (el) el.remove(); }, 1000);
+}
+function printReport() {
+  const style = document.createElement('style');
+  style.id = 'printOrient';
+  style.textContent = '@page { size: portrait; margin: 15mm; }';
+  document.head.appendChild(style);
+  window.print();
+  setTimeout(() => { const el = document.getElementById('printOrient'); if (el) el.remove(); }, 1000);
+}
