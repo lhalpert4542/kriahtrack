@@ -8,7 +8,13 @@ const CATS=[
 ];
 const HEB_MONTHS=[{id:'tishrei',label:'תשרי',order:1},{id:'cheshvan',label:'חשון',order:2},{id:'kislev',label:'כסלו',order:3},{id:'tevet',label:'טבת',order:4},{id:'shvat',label:'שבט',order:5},{id:'adar',label:'אדר',order:6},{id:'nisan',label:'ניסן',order:7},{id:'iyar',label:'אייר',order:8},{id:'sivan',label:'סיון',order:9},{id:'tamuz',label:'תמוז',order:10},{id:'av',label:'אב',order:11},{id:'elul',label:'אלול',order:12}];
 const CUR_YEAR='תשפ״ו',CUR_MONTH='sivan',HEB_TODAY='כ״ו סיון תשפ״ו';
-let PROVIDERS=[{id:'p1',name:'בית ספר אהבת תורה',director:'הרב משה לוי',email:'moshe@ahavatorah.edu',city:'בני ברק',classes:['א׳','ב׳','ג׳']},{id:'p2',name:'תלמוד תורה אור החיים',director:'הרב אברהם כהן',email:'avraham@orchaim.edu',city:'ירושלים',classes:['א׳','ב׳']},{id:'p3',name:'ישיבה קטנה בית יעקב',director:'הרב יצחק שפירא',email:'yitzchak@beitya.edu',city:'אשדוד',classes:['א׳','ב׳','ג׳','ד׳']},{id:'p4',name:'חדר מרכזי ברסלב',director:'הרב נחמן גרין',email:'nachman@breslov.edu',city:'צפת',classes:['א׳','ב׳']}];
+// Single school, multiple classes
+let SCHOOL = { name: 'מוסד הקריאה', classes: ['א׳','ב׳','ג׳','ד׳','ה׳','ו׳'] };
+let KRIAH_DIRECTOR = { name: '', email: '' }; // Set by admin
+let PROVIDERS=[{id:'p1',name:'כיתה א׳',director:'הרב משה לוי',email:'moshe@school.edu',city:'',classes:['א׳']},{id:'p2',name:'כיתה ב׳',director:'הרב אברהם כהן',email:'avraham@school.edu',city:'',classes:['ב׳']},{id:'p3',name:'כיתה ג׳',director:'הרב יצחק שפירא',email:'yitzchak@school.edu',city:'',classes:['ג׳']},{id:'p4',name:'כיתה ד׳',director:'הרב נחמן גרין',email:'nachman@school.edu',city:'',classes:['ד׳']}];
+// Report finalization state
+let REPORT_FINALS = {}; // key: studentId_month_year -> {finalized, note, lang}
+
 let STUDENTS=[{id:'s1',firstName:'יוסף',lastName:'כהן',providerId:'p1',class:'א׳',year:'תשפ״ו',status:'active',notes:''},{id:'s2',firstName:'מנחם',lastName:'לוי',providerId:'p1',class:'א׳',year:'תשפ״ו',status:'active',notes:''},{id:'s3',firstName:'אברהם',lastName:'גולדברג',providerId:'p1',class:'ב׳',year:'תשפ״ו',status:'active',notes:''},{id:'s4',firstName:'שמואל',lastName:'רוזנברג',providerId:'p2',class:'א׳',year:'תשפ״ו',status:'active',notes:''},{id:'s5',firstName:'דוד',lastName:'פרידמן',providerId:'p2',class:'ב׳',year:'תשפ״ו',status:'active',notes:''},{id:'s6',firstName:'ישראל',lastName:'ברגר',providerId:'p3',class:'א׳',year:'תשפ״ו',status:'active',notes:''},{id:'s7',firstName:'מרדכי',lastName:'שטיין',providerId:'p3',class:'ב׳',year:'תשפ״ו',status:'active',notes:''},{id:'s8',firstName:'פנחס',lastName:'וייס',providerId:'p3',class:'ג׳',year:'תשפ״ו',status:'active',notes:''},{id:'s9',firstName:'אליהו',lastName:'שוורץ',providerId:'p4',class:'א׳',year:'תשפ״ו',status:'active',notes:''},{id:'s10',firstName:'נחמן',lastName:'גרינבאום',providerId:'p4',class:'ב׳',year:'תשפ״ו',status:'active',notes:''},{id:'s11',firstName:'חיים',lastName:'בלום',providerId:'p1',class:'ג׳',year:'תשפ״ו',status:'active',notes:''},{id:'s12',firstName:'זלמן',lastName:'הורוביץ',providerId:'p2',class:'א׳',year:'תשפ״ו',status:'active',notes:''}];
 let ASSESSMENTS=[],SYS_LOGS=[{id:'l1',type:'success',message:'KriahTrack initialized with demo data',timestamp:new Date().toISOString()},{id:'l2',type:'info',message:'12 students, 4 providers, demo assessments loaded',timestamp:new Date().toISOString()}],AUDIT_LOG=[],OCR_IMPORTS=[];
 (function seed(){const months=['tishrei','cheshvan','kislev','tevet','shvat','adar','nisan','iyar','sivan'];STUDENTS.forEach(s=>{const base=10+Math.floor(Math.random()*12);months.forEach((m,mi)=>{if(Math.random()>0.12){const g=mi*1.2,n=()=>Math.floor(Math.random()*4)-1;ASSESSMENTS.push({id:`a_${s.id}_${m}`,studentId:s.id,providerId:s.providerId,month:m,year:CUR_YEAR,source:'manual',createdAt:new Date().toISOString(),categories:{otiyot:{correct:Math.max(0,Math.min(30,Math.floor(base+g+n()+8))),mistakes:Math.max(0,Math.floor(7-g*0.3+Math.abs(n())))},ot_nekuda:{correct:Math.max(0,Math.min(28,Math.floor(base+g+n()+4))),mistakes:Math.max(0,Math.floor(9-g*0.3+Math.abs(n())))},ot_nekuda_ot:{correct:Math.max(0,Math.min(25,Math.floor(base+g+n()))),mistakes:Math.max(0,Math.floor(11-g*0.3+Math.abs(n())))},milim:{correct:Math.max(0,Math.min(22,Math.floor(base+g+n()-2))),mistakes:Math.max(0,Math.floor(9-g*0.3+Math.abs(n())))},tehilim:{correct:Math.max(0,Math.min(20,Math.floor(base+g+n()-4))),mistakes:Math.max(0,Math.floor(7-g*0.3+Math.abs(n())))}}});}});});})();
@@ -675,3 +681,456 @@ function printReport() {
   window.print();
   setTimeout(() => { const el = document.getElementById('printOrient'); if (el) el.remove(); }, 1000);
 }
+
+// ============================================================
+// FEATURE OVERRIDES — All new requirements
+// ============================================================
+
+// ── KRIAH DIRECTOR PAGE ──────────────────────────────────────
+const _origRenderProviders = renderProviders;
+renderProviders = function() {
+  $('pageContent').innerHTML = `
+<div class="page-header">
+  <div><h1 class="page-title">Classes & Management</h1><p class="page-subtitle">Single school — multiple classes</p></div>
+  <button class="btn btn-primary" onclick="openAddProviderModal()">+ Add Class</button>
+</div>
+
+<!-- KRIAH DIRECTOR CARD -->
+<div class="card mb-6" style="border-top:4px solid #D9A44E">
+  <div class="card-header" style="background:linear-gradient(135deg,#003d56,#005778)">
+    <span class="card-title" style="color:#fff;font-size:1rem">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D9A44E" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+      Kriah Director — <span style="color:#D9A44E">מנהל הקריאה</span>
+    </span>
+    <button class="btn btn-sm" style="background:rgba(217,164,78,0.2);color:#D9A44E;border:1px solid #D9A44E" onclick="editKriahDirector()">Edit</button>
+  </div>
+  <div class="card-body" id="kriahDirectorDisplay">
+    ${KRIAH_DIRECTOR.name
+      ? `<div style="display:flex;align-items:center;gap:16px">
+          <div class="user-avatar" style="width:52px;height:52px;font-size:1.1rem;background:linear-gradient(135deg,#D9A44E,#b8832e)">${KRIAH_DIRECTOR.name.split(' ').map(w=>w[0]).join('').slice(0,2)}</div>
+          <div>
+            <div class="he" style="font-size:1.1rem;font-weight:800;color:#005778">${KRIAH_DIRECTOR.name}</div>
+            <div style="font-size:0.85rem;color:#808285;margin-top:3px">${KRIAH_DIRECTOR.email}</div>
+            <div style="font-size:0.75rem;color:#D9A44E;font-weight:700;margin-top:4px;text-transform:uppercase;letter-spacing:0.5px">Kriah Director — Oversees all classes</div>
+          </div>
+        </div>`
+      : `<div style="text-align:center;padding:20px;color:#808285">
+          <div style="font-size:2rem;margin-bottom:8px">👤</div>
+          <div style="font-weight:600;margin-bottom:4px">No Kriah Director set</div>
+          <div style="font-size:0.84rem">Click Edit to add the Kriah Director's name and email</div>
+          <button class="btn btn-gold btn-sm" style="margin-top:12px" onclick="editKriahDirector()">+ Set Kriah Director</button>
+        </div>`}
+  </div>
+</div>
+
+<!-- CLASSES GRID -->
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px">
+  ${PROVIDERS.map((p,i) => {
+    const ss = getProviderStudents(p.id);
+    const imp = ss.filter(s => getStudentTrend(s.id) === 'up').length;
+    const str = ss.filter(s => getStudentTrend(s.id) === 'down').length;
+    return `<div class="card" style="cursor:pointer;transition:all 0.2s" onclick="navigate('provider_profile',{providerId:'${p.id}'})" onmouseenter="this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 24px rgba(0,87,120,0.15)'" onmouseleave="this.style.transform='';this.style.boxShadow=''">
+      <div style="background:linear-gradient(135deg,#005778,#1a7a9a);padding:16px 18px;color:#fff">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="user-avatar" style="width:44px;height:44px;font-size:1rem;background:${avatarColor(i)}">${p.name.slice(0,2)}</div>
+          <div>
+            <div class="he" style="font-weight:800;font-size:1rem">${p.name}</div>
+            <div class="he" style="font-size:0.76rem;opacity:0.8;margin-top:2px">${p.director}</div>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;text-align:center">
+          <div><div style="font-size:1.4rem;font-weight:900;color:#005778">${ss.length}</div><div style="font-size:0.68rem;color:#808285">Students</div></div>
+          <div><div style="font-size:1.4rem;font-weight:900;color:#1a6038">${imp}</div><div style="font-size:0.68rem;color:#808285">Improving</div></div>
+          <div><div style="font-size:1.4rem;font-weight:900;color:#9a1c1c">${str}</div><div style="font-size:0.68rem;color:#808285">At Risk</div></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('')}
+</div>`;
+};
+
+function editKriahDirector() {
+  const name = prompt('Kriah Director Name:', KRIAH_DIRECTOR.name || '');
+  if (name === null) return;
+  const email = prompt('Kriah Director Email:', KRIAH_DIRECTOR.email || '');
+  if (email === null) return;
+  KRIAH_DIRECTOR.name = name.trim();
+  KRIAH_DIRECTOR.email = email.trim();
+  showToast('Kriah Director updated', 'success');
+  navigate('providers');
+}
+
+// ── REPORT FINALIZATION ──────────────────────────────────────
+function getReportKey(sid, month, year) { return `${sid}_${month}_${year}`; }
+function isReportFinal(sid, month, year) { return !!REPORT_FINALS[getReportKey(sid, month, year)]?.finalized; }
+function finalizeReport(sid, month, year) {
+  const key = getReportKey(sid, month, year);
+  REPORT_FINALS[key] = { ...REPORT_FINALS[key], finalized: true };
+  showToast('Report marked as final', 'success');
+}
+function unlockReport(sid, month, year) {
+  const key = getReportKey(sid, month, year);
+  if (REPORT_FINALS[key]) REPORT_FINALS[key].finalized = false;
+  showToast('Report unlocked for editing', 'info');
+}
+function getReportNote(sid, month, year) {
+  return REPORT_FINALS[getReportKey(sid, month, year)]?.note || '';
+}
+function getReportLang(sid, month, year) {
+  return REPORT_FINALS[getReportKey(sid, month, year)]?.lang || 'en';
+}
+function saveReportNote(sid, month, year, note, lang) {
+  const key = getReportKey(sid, month, year);
+  REPORT_FINALS[key] = { ...REPORT_FINALS[key], note, lang };
+}
+
+// ── YIDDISH AI NOTES (proper Yiddish from ivelt/yiddish24 style) ─────────────
+const YIDDISH_NOTES = {
+  up: [
+    'דער תלמיד האט זיך אין דעם חודש שטארק פארבעסערט. ער לייענט מיט גרויס פלייס און פארשטייט גוט. מיר זענען זייער צופרידן מיט זיין פארשריט.',
+    'א שיינע פארבעסערונג דעם חודש! דער תלמיד לייענט פלינקער און מיט מער זיכערקייט. ער זאל אזוי ווייטערמאכן.',
+    'דעם חודש האט דער תלמיד אויסגעוויזן א שטארקע וואקסונג אין זיין קריאה. זיין פלייס איז זייער לויבנסווערט.',
+  ],
+  down: [
+    'דעם חודש האט דער תלמיד עטוואס שווערע צייטן. מיר וועלן אים מער אויפמערקזאמקייט גיבן כדי צו העלפן אים פארבעסערן.',
+    'עס זענען פאראן עטלעכע חסרונות דעם חודש. מיר ביטן די עלטערן צו חזרן מיט דעם קינד אויף די לקחים בבית.',
+    'דער תלמיד דארף נאך מער איבונג. מיר וועלן צוזאמענארבעטן כדי צו העלפן אים דערגרייכן זיין פולן פאטענציאל.',
+  ],
+  flat: [
+    'דער תלמיד האלט זיין ניוואו גוט. ער לייענט מיט קאנסיסטענץ און מיר זענען צופרידן מיט זיין ארבעט.',
+    'א שטייענדיקע לייסטונג דעם חודש. דער תלמיד ארבעט פלייסיק און האלט זיין ניוואו.',
+    'דעם חודש האט דער תלמיד ווידער אמאל באוויזן זיין פארלאסלעכקייט. מיר זענען צופרידן מיט זיין קאנסיסטענטע ארבעט.',
+  ]
+};
+
+const ENGLISH_NOTES = {
+  up: [
+    'Strong progress this month. Continues to build fluency and accuracy across all categories.',
+    'Excellent improvement this month. Reading with greater confidence and speed.',
+    'Outstanding growth this month. Consistent effort is clearly paying off.',
+  ],
+  down: [
+    'Some challenges this month. Additional practice at home is recommended.',
+    'A difficult month. We will provide extra support to help get back on track.',
+    'Below expected performance this month. Please review material at home regularly.',
+  ],
+  flat: [
+    'Steady performance this month. Maintaining consistent reading skills.',
+    'Solid and reliable work this month. Continuing at a good pace.',
+    'Consistent results this month. Keeping up well with the curriculum.',
+  ]
+};
+
+function generateAINote(sid, trend, lang) {
+  const pool = lang === 'yi' ? YIDDISH_NOTES[trend] || YIDDISH_NOTES.flat : ENGLISH_NOTES[trend] || ENGLISH_NOTES.flat;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// ── FULL REPORT OVERRIDE ─────────────────────────────────────
+showStudentReport = function(sid, targetMonth, targetYear) {
+  const s = getStudent(sid);
+  const allAss = getStudentAssessments(sid);
+  const prov = getProvider(s.providerId);
+  if (!allAss.length) { showToast('No assessments for report', 'warning'); return; }
+
+  // Default to last assessment if not specified
+  const month = targetMonth || allAss[allAss.length - 1].month;
+  const year  = targetYear  || allAss[allAss.length - 1].year;
+  const monthLabel = getMonthLabel(month);
+  const currentA = allAss.find(a => a.month === month && a.year === year);
+  if (!currentA) { showToast('No assessment for selected month', 'warning'); return; }
+
+  // YTD: only months up to and including selected month
+  const monthOrder = getMonthOrder(month);
+  const ytdAss = allAss.filter(a => getMonthOrder(a.month) <= monthOrder && a.year === year);
+
+  const isFinal = isReportFinal(sid, month, year);
+  const savedNote = getReportNote(sid, month, year);
+  const savedLang = getReportLang(sid, month, year);
+  const trend = getStudentTrend(sid);
+  const directorName = KRIAH_DIRECTOR.name || (prov ? prov.director : '');
+
+  $('reportPreviewBody').innerHTML = `
+<div id="reportDoc" style="font-family:'Frank Ruhl Libre','Heebo',serif;direction:rtl;max-width:680px;margin:0 auto;background:#fff">
+
+  <!-- STATUS BAR -->
+  <div class="no-print" style="background:${isFinal?'#e4f2eb':'#fff3e0'};border:1px solid ${isFinal?'#a8d8bc':'#ecc870'};border-radius:8px;padding:10px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;font-size:0.84rem">
+    <span style="font-weight:700;color:${isFinal?'#1a6038':'#7a4800'}">${isFinal ? '✓ Report Finalized' : '✏ Draft — not yet finalized'}</span>
+    <div style="display:flex;gap:8px">
+      ${isFinal
+        ? `<button class="btn btn-sm" style="background:#fff;border:1px solid #808285;color:#808285" onclick="unlockReport('${sid}','${month}','${year}');showStudentReport('${sid}','${month}','${year}')">🔓 Unlock to Edit</button>`
+        : `<button class="btn btn-primary btn-sm" onclick="finalizeReport('${sid}','${month}','${year}');showStudentReport('${sid}','${month}','${year}')">✓ Mark as Final</button>`}
+    </div>
+  </div>
+
+  <!-- LETTERHEAD BACKGROUND -->
+  <div style="position:relative;overflow:hidden">
+    <!-- Teal header banner -->
+    <div style="background:linear-gradient(135deg,#005778,#1a7a9a);padding:0;position:relative">
+      <div style="display:flex;align-items:center;justify-content:center;padding:14px 24px;gap:16px">
+        <div style="color:#D9A44E;font-size:2rem;line-height:1">❧</div>
+        <img src="assets/logo.png" style="width:68px;height:68px;object-fit:contain;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.3))" onerror="this.style.display='none'">
+        <div style="text-align:center;color:#fff">
+          <div style="font-size:0.65rem;color:rgba(255,255,255,0.7);letter-spacing:1.5px;text-transform:uppercase">מערכת הקריאה</div>
+          <div style="font-size:1.5rem;font-weight:900;letter-spacing:0.5px">מחדדים בפיך</div>
+          <div style="font-size:0.62rem;color:rgba(255,255,255,0.6);margin-top:2px">איחוד מוסדות החינוך</div>
+        </div>
+        <div style="color:#D9A44E;font-size:2rem;line-height:1">❦</div>
+      </div>
+      <div style="height:3px;background:linear-gradient(90deg,transparent,#D9A44E,transparent)"></div>
+    </div>
+
+    <!-- DATE & STUDENT -->
+    <div style="padding:18px 28px 12px;text-align:center;border-bottom:2px solid #e8d9b8;background:#fff">
+      <div class="he" style="font-size:0.9rem;color:#808285;margin-bottom:8px">${monthLabel} ${year}</div>
+      <div class="he" style="font-size:0.85rem;color:#444;margin-bottom:6px">לכבוד התלמיד היקר</div>
+      <div class="he" style="font-size:1.5rem;font-weight:900;color:#005778">${s.firstName} ${s.lastName}</div>
+      <div class="he" style="font-size:0.85rem;color:#555;margin-top:6px">מזל טוב על תוצאות הקריאה החודשיות שלך!</div>
+    </div>
+
+    <!-- CURRENT MONTH SCORES -->
+    <div style="padding:16px 28px;background:#fff">
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;direction:rtl">
+        ${CATS.map(cat => {
+          const correct  = currentA.categories[cat.id]?.correct  || 0;
+          const mistakes = currentA.categories[cat.id]?.mistakes || 0;
+          return `<div style="background:#005778;border-radius:10px;padding:14px 6px;text-align:center;color:#fff">
+            <div class="he" style="font-size:0.6rem;font-weight:700;color:rgba(255,255,255,0.8);margin-bottom:8px;line-height:1.4">${cat.label}</div>
+            <div style="font-size:1.9rem;font-weight:900;line-height:1">${correct}</div>
+            ${cat.hasMistakes ? `<div style="font-size:0.62rem;color:rgba(255,180,180,0.9);margin-top:4px">${mistakes} err.</div>` : `<div style="height:16px"></div>`}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <!-- YTD TABLE -->
+    <div style="padding:0 28px 16px;background:#fff">
+      <table style="width:100%;border-collapse:collapse;direction:rtl;font-size:0.82rem">
+        <thead>
+          <tr style="background:#005778;color:#fff">
+            <th style="padding:9px 10px;text-align:right;font-weight:700">חודש</th>
+            ${CATS.map(cat => `<th style="padding:9px 8px;text-align:center;font-weight:700;border-right:1px solid rgba(255,255,255,0.2)">
+              <span class="he" style="font-size:0.7rem">${cat.label}</span>
+            </th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${ytdAss.map((a, i) => {
+            const isCurrent = a.month === month;
+            return `<tr style="background:${isCurrent ? '#e0eef5' : i%2===0?'#fff':'#f8f9fa'};font-weight:${isCurrent?'700':'400'}">
+              <td style="padding:8px 10px;text-align:right;border-bottom:1px solid #e8d9b8">
+                <span class="he" style="color:${isCurrent?'#005778':'#333'}">${getMonthLabel(a.month)}</span>
+              </td>
+              ${CATS.map(cat => {
+                const correct  = a.categories[cat.id]?.correct  || 0;
+                const mistakes = a.categories[cat.id]?.mistakes || 0;
+                return `<td style="padding:8px;text-align:center;border-bottom:1px solid #e8d9b8;border-right:1px solid #e8d9b8">
+                  <span style="font-weight:700;color:#005778">${correct}</span>
+                  ${cat.hasMistakes && mistakes > 0 ? `<span style="font-size:0.62rem;color:#9a1c1c;display:block">-${mistakes}</span>` : ''}
+                </td>`;
+              }).join('')}
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- NOTE SECTION -->
+    <div style="padding:0 28px 16px;background:#fff">
+      ${isFinal
+        ? (savedNote
+            ? `<div style="border:1px solid #e8d9b8;border-radius:8px;padding:14px;background:#fdf8f0">
+                <div style="font-size:0.85rem;color:#333;line-height:1.8;${savedLang==='yi'?'direction:rtl;text-align:right;font-family:var(--font-he)':''}">${savedNote}</div>
+               </div>`
+            : `<div style="height:60px"></div>`)
+        : `<div class="no-print" style="border:1px solid #e8d9b8;border-radius:8px;overflow:hidden">
+            <div style="background:#f0f0f0;padding:8px 14px;display:flex;align-items:center;justify-content:space-between">
+              <span style="font-size:0.78rem;font-weight:700;color:#444">Note (optional)</span>
+              <div style="display:flex;gap:6px;align-items:center">
+                <select id="noteLang" style="font-size:0.76rem;padding:3px 8px;border:1px solid #ddd;border-radius:4px" onchange="switchNoteLang(this.value,'${sid}','${month}','${year}')">
+                  <option value="en" ${savedLang==='en'?'selected':''}>English</option>
+                  <option value="yi" ${savedLang==='yi'?'selected':''}>Yiddish</option>
+                </select>
+                <button class="btn btn-sm" style="background:#005778;color:#fff;font-size:0.72rem;padding:4px 10px" onclick="aiGenerateNote('${sid}','${month}','${year}')">✨ AI Generate</button>
+              </div>
+            </div>
+            <textarea id="reportNoteInput" rows="3" style="width:100%;padding:12px;border:none;font-size:0.85rem;font-family:${savedLang==='yi'?'var(--font-he)':'var(--font-en)'};direction:${savedLang==='yi'?'rtl':'ltr'};resize:vertical;outline:none;color:#333;line-height:1.7" placeholder="${savedLang==='yi'?'שרייב אן אנמערקונג...':'Write a note...'}" oninput="saveReportNote('${sid}','${month}','${year}',this.value,document.getElementById('noteLang').value)">${savedNote}</textarea>
+          </div>
+          <div style="border:1px solid #e8d9b8;border-radius:8px;padding:14px;background:#fdf8f0;margin-top:8px;min-height:50px;${savedLang==='yi'?'direction:rtl;text-align:right;font-family:var(--font-he)':''}">
+            <div id="noteLivePreview" style="font-size:0.85rem;color:#333;line-height:1.8">${savedNote || '<span style="color:#ccc;font-style:italic">Note will appear here...</span>'}</div>
+          </div>`}
+    </div>
+
+    <!-- DIRECTOR -->
+    <div style="padding:0 28px 20px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #e8d9b8;padding-top:12px;background:#fff">
+      <div style="font-size:0.82rem;color:#444">
+        <span style="font-weight:700;color:#808285;text-transform:uppercase;font-size:0.7rem;letter-spacing:0.5px">Director: </span>
+        <span class="he" style="font-weight:700;color:#005778">${directorName}</span>
+      </div>
+      <div style="font-size:0.75rem;color:#808285">KriahTrack — מערכת הקריאה</div>
+    </div>
+
+    <!-- BOTTOM BANNER -->
+    <div style="background:linear-gradient(135deg,#005778,#1a7a9a);height:8px;border-radius:0 0 8px 8px"></div>
+  </div>
+</div>`;
+
+  // Wire live preview
+  const ta = document.getElementById('reportNoteInput');
+  if (ta) {
+    ta.addEventListener('input', () => {
+      const preview = document.getElementById('noteLivePreview');
+      if (preview) preview.innerHTML = ta.value || '<span style="color:#ccc;font-style:italic">Note will appear here...</span>';
+    });
+  }
+
+  openModal('reportPreviewModal');
+};
+
+function switchNoteLang(lang, sid, month, year) {
+  const ta = document.getElementById('reportNoteInput');
+  if (!ta) return;
+  ta.style.direction = lang === 'yi' ? 'rtl' : 'ltr';
+  ta.style.fontFamily = lang === 'yi' ? 'var(--font-he)' : 'var(--font-en)';
+  ta.placeholder = lang === 'yi' ? 'שרייב אן אנמערקונג...' : 'Write a note...';
+  saveReportNote(sid, month, year, ta.value, lang);
+}
+
+function aiGenerateNote(sid, month, year) {
+  const lang = document.getElementById('noteLang')?.value || 'en';
+  const trend = getStudentTrend(sid);
+  const note = generateAINote(sid, trend, lang);
+  const ta = document.getElementById('reportNoteInput');
+  if (ta) {
+    ta.value = note;
+    ta.style.direction = lang === 'yi' ? 'rtl' : 'ltr';
+    ta.style.fontFamily = lang === 'yi' ? 'var(--font-he)' : 'var(--font-en)';
+    const preview = document.getElementById('noteLivePreview');
+    if (preview) preview.innerHTML = note;
+    saveReportNote(sid, month, year, note, lang);
+  }
+  showToast('AI note generated', 'success');
+}
+
+// ── PRINT REPORT — only current month's report ───────────────
+printReport = function() {
+  const style = document.createElement('style');
+  style.id = 'printOrient';
+  style.textContent = `
+    @page { size: portrait; margin: 12mm; }
+    .no-print { display: none !important; }
+    body > *:not(#reportPreviewModal) { display: none !important; }
+    #reportPreviewModal { display: block !important; position: static !important; background: none !important; padding: 0 !important; }
+    #reportPreviewModal .modal { max-width: 100% !important; box-shadow: none !important; transform: none !important; }
+    #reportPreviewModal .modal-header, #reportPreviewModal .modal-footer { display: none !important; }
+  `;
+  document.head.appendChild(style);
+  window.print();
+  setTimeout(() => { const el = document.getElementById('printOrient'); if (el) el.remove(); }, 1500);
+};
+
+// ── REPORTS PAGE — show month selector, finalization status ──
+const _origRenderReports = renderReports;
+renderReports = function() {
+  $('pageContent').innerHTML = `
+<div class="page-header">
+  <div><h1 class="page-title">Monthly Reports</h1><p class="page-subtitle">Generate, finalize and print reports by class and month</p></div>
+</div>
+<div class="card mb-6">
+  <div class="card-header"><span class="card-title">Report Settings</span></div>
+  <div class="card-body">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
+      <div class="form-group"><label class="form-label">Class</label>
+        <select class="form-control" id="rProv" onchange="_rp=this.value;genReports()">
+          <option value="">All Classes</option>
+          ${PROVIDERS.map(p=>`<option value="${p.id}" ${_rp===p.id?'selected':''}>${p.name}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Month</label>
+        <select class="form-control he" id="rMonth" onchange="_rm=this.value;genReports()">
+          ${HEB_MONTHS.map(m=>`<option value="${m.id}" ${_rm===m.id?'selected':''}>${m.label}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Note Language</label>
+        <div style="display:flex;background:#f0ece4;border-radius:20px;padding:3px;gap:2px;margin-top:6px">
+          <button style="padding:5px 14px;border-radius:17px;font-size:0.78rem;font-weight:700;cursor:pointer;border:none;background:${_rl==='en'?'#005778':'transparent'};color:${_rl==='en'?'#fff':'#808285'}" onclick="_rl='en';renderReports()">English</button>
+          <button style="padding:5px 14px;border-radius:17px;font-size:0.78rem;font-weight:700;cursor:pointer;border:none;background:${_rl==='yi'?'#005778':'transparent'};color:${_rl==='yi'?'#fff':'#808285'}" onclick="_rl='yi';renderReports()">Yiddish</button>
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="genReports()">Generate Reports</button>
+  </div>
+</div>
+<div id="rGrid"></div>`;
+  genReports();
+};
+
+genReports = function() {
+  _rp = document.getElementById('rProv')?.value || _rp;
+  _rm = document.getElementById('rMonth')?.value || _rm;
+  const ss = _rp ? getProviderStudents(_rp) : STUDENTS;
+  // Only show students who have assessment for selected month
+  const wd = ss.filter(s => ASSESSMENTS.some(a => a.studentId === s.id && a.month === _rm));
+  const ml = getMonthLabel(_rm);
+
+  $('rGrid').innerHTML = `
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+  <h3>${wd.length} Reports — <span class="he">${ml} ${CUR_YEAR}</span></h3>
+  <button class="btn btn-ghost btn-sm" onclick="window.print()">Print All</button>
+</div>
+${wd.length === 0
+  ? `<div style="text-align:center;padding:60px;color:#808285">No data for <span class="he">${ml}</span></div>`
+  : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px">
+      ${wd.map(s => {
+        const a = ASSESSMENTS.find(x => x.studentId === s.id && x.month === _rm);
+        const prov = getProvider(s.providerId);
+        const t = getStudentTrend(s.id);
+        const isFinal = isReportFinal(s.id, _rm, CUR_YEAR);
+        return `<div style="border:1px solid #e8d9b8;border-radius:12px;overflow:hidden;transition:all 0.2s" onmouseenter="this.style.boxShadow='0 4px 16px rgba(0,87,120,0.12)'" onmouseleave="this.style.boxShadow=''">
+          <div style="background:linear-gradient(135deg,#005778,#1a7a9a);padding:14px 18px;color:#fff">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div>
+                <div class="he" style="font-weight:800;font-size:0.95rem">${sName(s)}</div>
+                <div class="he" style="font-size:0.76rem;opacity:0.8;margin-top:2px">${prov?.name||'—'} | Class ${s.class}</div>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+                ${trendBadge(t)}
+                ${isFinal ? '<span style="background:#1a6038;color:#fff;font-size:0.6rem;font-weight:800;padding:2px 7px;border-radius:20px">✓ FINAL</span>' : '<span style="background:rgba(255,255,255,0.2);color:#fff;font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:20px">DRAFT</span>'}
+              </div>
+            </div>
+          </div>
+          <div style="padding:14px 18px;background:#fff">
+            <div style="margin-bottom:10px">
+              ${CATS.map(cat => `<div style="display:flex;justify-content:space-between;font-size:0.8rem;padding:3px 0;border-bottom:1px solid #f0ece4">
+                <span class="he" style="color:${cat.color};font-weight:600">${cat.label}</span>
+                <span style="font-weight:700;color:#005778">${a?.categories[cat.id]?.correct||0}${cat.hasMistakes && (a?.categories[cat.id]?.mistakes||0)>0 ? ` <span style="color:#9a1c1c;font-size:0.72rem">(-${a.categories[cat.id].mistakes})</span>` : ''}</span>
+              </div>`).join('')}
+            </div>
+          </div>
+          <div style="padding:10px 18px;background:#fdf8f0;border-top:1px solid #e8d9b8;display:flex;gap:7px">
+            <button class="btn btn-primary btn-sm" onclick="showStudentReport('${s.id}','${_rm}','${CUR_YEAR}')">View / Edit</button>
+            <button class="btn btn-ghost btn-sm" onclick="showStudentReport('${s.id}','${_rm}','${CUR_YEAR}');setTimeout(printReport,600)">Print</button>
+            ${isFinal
+              ? `<button class="btn btn-sm" style="background:#fff;border:1px solid #808285;color:#808285;font-size:0.72rem" onclick="unlockReport('${s.id}','${_rm}','${CUR_YEAR}');genReports()">🔓</button>`
+              : `<button class="btn btn-sm" style="background:#e4f2eb;border:1px solid #a8d8bc;color:#1a6038;font-size:0.72rem" onclick="finalizeReport('${s.id}','${_rm}','${CUR_YEAR}');genReports()">✓ Final</button>`}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`}`;
+};
+
+// ── SIDEBAR OFFSET FIX ───────────────────────────────────────
+// Ensure content never overlaps sidebar
+(function fixLayout() {
+  const style = document.createElement('style');
+  style.textContent = `
+    .main-content { margin-left: 248px !important; }
+    @media (max-width: 900px) { .main-content { margin-left: 0 !important; } }
+    .page-content { padding: 26px !important; }
+    /* Letterhead watermark on reports */
+    #reportDoc { position: relative; }
+  `;
+  document.head.appendChild(style);
+})();

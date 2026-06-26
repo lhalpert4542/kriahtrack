@@ -62,7 +62,7 @@ p{line-height:1.65;color:#2a4040}
 .user-info .user-role{font-size:0.65rem;color:rgba(255,255,255,0.45);margin-top:1px}
 
 /* MAIN */
-.main-content{flex:1;margin-left:var(--sidebar);display:flex;flex-direction:column;min-height:100vh}
+.main-content{flex:1;margin-left:248px;display:flex;flex-direction:column;min-height:100vh}
 .top-header{height:var(--header);background:#fff;border-bottom:1.5px solid var(--parch-b);display:flex;align-items:center;padding:0 26px;gap:14px;position:sticky;top:0;z-index:50;box-shadow:var(--sh-sm)}
 .header-breadcrumb{flex:1;display:flex;align-items:center;gap:8px;font-size:0.84rem;color:var(--gray)}
 .header-breadcrumb #headerBreadcrumb{font-weight:800;color:#1a2a2a;font-size:0.98rem}
@@ -230,4 +230,54 @@ tbody td.num { text-align: center; font-family: 'Plus Jakarta Sans', sans-serif;
   .page-content { padding: 0 !important; }
   body { background: #fff !important; }
   .card { box-shadow: none !important; border: 1px solid #ddd !important; }
+}
+
+/* Report letterhead background */
+#reportDoc {
+  background-image: url('assets/letterhead.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+#reportDoc > div {
+  background: rgba(255,255,255,0.94);
+}
+
+/* Report modal body padding */
+#reportPreviewBody {
+  padding: 0 !important;
+  background: #f5f5f5;
+}
+
+/* Note textarea */
+#reportNoteInput {
+  width: 100%;
+  border: none;
+  outline: none;
+  resize: vertical;
+  background: transparent;
+}
+
+/* Finalized badge */
+.badge-final { background: #e4f2eb; color: #1a6038; }
+.badge-draft  { background: #fff3e0; color: #7a4800; }
+
+/* RTL table fix */
+table { direction: rtl; }
+thead th { text-align: right; }
+tbody td { text-align: right; }
+
+/* Print */
+@media print {
+  @page { margin: 10mm; }
+  .no-print { display: none !important; }
+  .sidebar, .top-header { display: none !important; }
+  .main-content { margin-left: 0 !important; }
+  body { background: #fff !important; }
+}
+@media (max-width: 900px) {
+  .main-content { margin-left: 0 !important; }
+  .sidebar { transform: translateX(-100%); }
+  .sidebar.open { transform: translateX(0); }
+  .mobile-menu-btn { display: flex; }
 }
