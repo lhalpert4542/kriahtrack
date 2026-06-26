@@ -347,14 +347,35 @@ function openAddAssessmentModal(sid){
   _aSid=sid;const s=getStudent(sid);
   $('assessmentModalTitle').textContent=`Add Assessment — ${sName(s)}`;
   const sel=$('assessmentMonth');if(sel)sel.innerHTML=HEB_MONTHS.map(m=>`<option value="${m.id}" ${m.id===CUR_MONTH?'selected':''}>${m.label}</option>`).join('');
-  const inp=$('assessmentCategoryInputs');if(inp)inp.innerHTML=CATS.map(cat=>`<div class="card" style="margin-bottom:10px;border-right:4px solid ${cat.color}"><div class="card-body" style="padding:12px 16px"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px"><span class="he" style="font-weight:700;color:${cat.color}">${cat.label}</span><div style="display:flex;gap:16px"><div style="display:flex;flex-direction:column;align-items:center;gap:3px"><label style="font-size:0.68rem;font-weight:800;color:#1a6038;text-transform:uppercase">Correct</label><input type="number" min="0" max="99" id="c_${cat.id}_c" value="0" style="width:64px;text-align:center;padding:6px;border:1.5px solid #1a6038;border-radius:6px;font-weight:800;font-size:0.95rem"></div><div style="display:flex;flex-direction:column;align-items:center;gap:3px"><label style="font-size:0.68rem;font-weight:800;color:#9a1c1c;text-transform:uppercase">Mistakes</label><input type="number" min="0" max="99" id="c_${cat.id}_m" value="0" style="width:64px;text-align:center;padding:6px;border:1.5px solid #9a1c1c;border-radius:6px;font-weight:800;font-size:0.95rem"></div></div></div></div></div>`).join('');
+    const inp=$('assessmentCategoryInputs');
+  if(inp) inp.innerHTML = CATS.map(cat => `
+    <div class="card" style="margin-bottom:10px;border-right:4px solid ${cat.color}">
+      <div class="card-body" style="padding:12px 16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+          <span class="he" style="font-weight:700;color:${cat.color}">${cat.label}</span>
+          <div style="display:flex;gap:16px;align-items:flex-end">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+              <label style="font-size:0.68rem;font-weight:800;color:#1a6038;text-transform:uppercase">Correct</label>
+              <input type="number" min="0" max="99" id="c_${cat.id}_c" value="0"
+                style="width:64px;text-align:center;padding:6px;border:1.5px solid #1a6038;border-radius:6px;font-weight:800;font-size:0.95rem">
+            </div>
+            ${cat.hasMistakes ? `
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+              <label style="font-size:0.68rem;font-weight:800;color:#9a1c1c;text-transform:uppercase">Mistakes</label>
+              <input type="number" min="0" max="99" id="c_${cat.id}_m" value="0"
+                style="width:64px;text-align:center;padding:6px;border:1.5px solid #9a1c1c;border-radius:6px;font-weight:800;font-size:0.95rem">
+            </div>` : ''}
+          </div>
+        </div>
+      </div>
+    </div>`).join('');
   openModal('addAssessmentModal');
 }
 function saveAssessment(){
   const sid=_aSid,month=$('assessmentMonth')?.value,year=$('assessmentYear')?.value||CUR_YEAR;
   if(!sid||!month){showToast('Please select a month','warning');return;}
   const s=getStudent(sid),cats={};
-  CATS.forEach(cat=>{cats[cat.id]={correct:parseInt($(`c_${cat.id}_c`)?.value)||0,mistakes:parseInt($(`c_${cat.id}_m`)?.value)||0};});
+  CATS.forEach(cat=>{cats[cat.id]={correct:parseInt($(`c_${cat.id}_c`)?.value)||0,mistakes:cat.hasMistakes?(parseInt($(`c_${cat.id}_m`)?.value)||0):0};});
   const newA={id:genId('a'),studentId:sid,providerId:s.providerId,month,year,source:'manual',createdAt:new Date().toISOString(),categories:cats};
   const idx=ASSESSMENTS.findIndex(a=>a.studentId===sid&&a.month===month&&a.year===year);
   if(idx>=0)ASSESSMENTS[idx]=newA;else ASSESSMENTS.push(newA);
