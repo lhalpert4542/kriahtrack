@@ -15,8 +15,15 @@
 <div class="toast-container" id="toastContainer"></div>
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 <!-- LOADING SCREEN -->
-<div id="loadingScreen" style="position:fixed;inset:0;background:linear-gradient(160deg,#0a3535 0%,#0f4444 50%,#1a5f5f 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;color:#fff;font-family:'Heebo',sans-serif">
-  <div style="position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(196,154,10,0.08) 0%,transparent 70%);pointer-events:none"></div>
+<div id="loadingScreen" style="position:fixed;inset:0;background:linear-gradient(160deg,#0a3535 0%,#0f4444 50%,#1a5f5f 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;color:#fff;font-family:Heebo,sans-serif">
+  <img src="assets/logo.png" style="width:90px;height:90px;object-fit:contain;margin-bottom:20px;filter:drop-shadow(0 4px 16px rgba(0,0,0,0.45))" onerror="this.style.display='none'">
+  <div style="font-size:1.8rem;font-weight:800;margin-bottom:6px;letter-spacing:0.5px">KriahTrack</div>
+  <div style="font-size:0.8rem;color:rgba(196,154,10,0.9);margin-bottom:32px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase">Kriah Progress System</div>
+  <div style="width:220px;height:5px;background:rgba(255,255,255,0.12);border-radius:3px;overflow:hidden;margin-bottom:12px">
+    <div id="loadBar" style="height:100%;background:linear-gradient(90deg,#c49a0a,#e2c050);border-radius:3px;width:0%;transition:width 0.4s ease"></div>
+  </div>
+  <div id="loadMsg" style="font-size:0.8rem;color:rgba(255,255,255,0.45);font-weight:400">Connecting...</div>
+</div>
   <img src="assets/logo.png" style="width:96px;height:96px;object-fit:contain;margin-bottom:22px;filter:drop-shadow(0 4px 16px rgba(0,0,0,0.45))" onerror="this.style.display='none'">
   <div style="font-size:1.9rem;font-weight:800;margin-bottom:6px;letter-spacing:0.5px">KriahTrack</div>
   <div style="font-size:0.85rem;color:rgba(196,154,10,0.85);margin-bottom:36px;font-weight:500;letter-spacing:1px;text-transform:uppercase">Kriah Progress System</div>
@@ -211,5 +218,32 @@
 <script src="ocr_engine.js"></script>
 <script src="pages.js"></script>
 <script src="app_connected.js"></script>
+<!-- ESCAPE HATCH: shows fallback UI if JS fails within 10s -->
+<script>
+(function(){
+  window._escapeTimer = setTimeout(function(){
+    var ls = document.getElementById('loadingScreen');
+    if (!ls || ls.style.display === 'none') return;
+    ls.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;gap:16px;padding:40px">'
+      + '<img src="assets/logo.png" style="width:72px;height:72px;object-fit:contain;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.4))" onerror="this.style.display='none'">'
+      + '<div style="font-size:1.4rem;font-weight:800;color:#fff">KriahTrack</div>'
+      + '<div style="color:rgba(255,255,255,0.55);font-size:0.85rem">Taking longer than expected</div>'
+      + '<div style="display:flex;gap:10px;margin-top:8px">'
+      + '<button onclick="location.reload()" style="background:#c49a0a;color:#fff;border:none;padding:9px 22px;border-radius:8px;font-size:0.88rem;font-weight:600;cursor:pointer">Reload Page</button>'
+      + '<button onclick="window._forceShow()" style="background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.25);padding:9px 22px;border-radius:8px;font-size:0.88rem;font-weight:600;cursor:pointer">Continue Anyway</button>'
+      + '</div></div>';
+  }, 10000);
+
+  window._forceShow = function(){
+    if (window._escapeTimer) clearTimeout(window._escapeTimer);
+    var ls = document.getElementById('loadingScreen');
+    var sh = document.getElementById('appShell');
+    if (ls) ls.style.display = 'none';
+    if (sh) sh.style.display = 'flex';
+    try { navigate('dashboard'); } catch(e) { location.reload(); }
+  };
+})();
+</script>
+
 </body>
 </html>

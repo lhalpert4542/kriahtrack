@@ -39,7 +39,7 @@ function renderDashboard() {
         </div>
         <div class="kpi-value">${totalStudents}</div>
         <div class="kpi-label">Active Students</div>
-        <div class="kpi-trend up">↑ שנה"ל ${CURRENT_HEBREW_YEAR}</div>
+        <div class="kpi-trend up">↑ YTD ${CURRENT_HEBREW_YEAR}</div>
       </div>
       <div class="kpi-card gold" onclick="navigate('providers')" style="cursor:pointer">
         <div class="kpi-icon" style="background:var(--gold-100);color:var(--gold-600)">
@@ -360,12 +360,12 @@ function renderProfileOverview(studentId, student, assessments, ytd, lastA, prov
                   <div class="category-scores">
                     <div class="score-pill correct">
                       <span class="score-val">${lastA.categories[cat.id]?.correct||0}</span>
-                      <span class="score-label">נכון</span>
+                      <span class="score-label">Correct</span>
                     </div>
                     <div style="color:var(--text-light);font-size:0.8rem;align-self:center">/</div>
                     <div class="score-pill mistakes">
                       <span class="score-val">${lastA.categories[cat.id]?.mistakes||0}</span>
-                      <span class="score-label">שגיאות</span>
+                      <span class="score-label">Mistakes</span>
                     </div>
                   </div>
                 </div>`).join('')}
@@ -426,7 +426,7 @@ function renderProfileOverview(studentId, student, assessments, ytd, lastA, prov
             </tr>
             <tr style="background:var(--teal-700)">
               <th></th>
-              ${CATEGORIES.map(() => `<th style="font-size:0.72rem;color:var(--teal-200)">נכון</th><th style="font-size:0.72rem;color:var(--teal-200);border-right:2px solid rgba(255,255,255,0.2)">שגיאות</th>`).join('')}
+              ${CATEGORIES.map(() => `<th style="font-size:0.72rem;color:var(--teal-200)">Correct</th><th style="font-size:0.72rem;color:var(--teal-200);border-right:2px solid rgba(255,255,255,0.2)">Mistakes</th>`).join('')}
               <th></th>
             </tr>
           </thead>
@@ -472,9 +472,9 @@ function renderProfileAssessments(studentId, assessments) {
               <div class="category-card" style="border-top:3px solid ${cat.color}">
                 <div class="category-name">${cat.label}</div>
                 <div class="category-scores">
-                  <div class="score-pill correct"><span class="score-val">${a.categories[cat.id]?.correct||0}</span><span class="score-label">נכון</span></div>
+                  <div class="score-pill correct"><span class="score-val">${a.categories[cat.id]?.correct||0}</span><span class="score-label">Correct</span></div>
                   <div style="color:var(--text-light);align-self:center">/</div>
-                  <div class="score-pill mistakes"><span class="score-val">${a.categories[cat.id]?.mistakes||0}</span><span class="score-label">שגיאות</span></div>
+                  <div class="score-pill mistakes"><span class="score-val">${a.categories[cat.id]?.mistakes||0}</span><span class="score-label">Mistakes</span></div>
                 </div>
               </div>`).join('')}
           </div>
@@ -510,8 +510,8 @@ function renderProfileCharts(studentId, assessments) {
         data: {
           labels,
           datasets: [
-            { label: 'נכון', data: assessments.map(a => a.categories[cat.id]?.correct||0), borderColor: cat.color, backgroundColor: cat.color+'30', tension: 0.4, fill: true, pointRadius: 5 },
-            { label: 'שגיאות', data: assessments.map(a => a.categories[cat.id]?.mistakes||0), borderColor: '#F44336', backgroundColor: '#F4433620', tension: 0.4, fill: false, borderDash: [5,5], pointRadius: 4 },
+            { label: 'Correct', data: assessments.map(a => a.categories[cat.id]?.correct||0), borderColor: cat.color, backgroundColor: cat.color+'30', tension: 0.4, fill: true, pointRadius: 5 },
+            { label: 'Mistakes', data: assessments.map(a => a.categories[cat.id]?.mistakes||0), borderColor: '#F44336', backgroundColor: '#F4433620', tension: 0.4, fill: false, borderDash: [5,5], pointRadius: 4 },
           ]
         },
         options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom', labels:{ font:{size:10}, padding:8 } } }, scales:{ x:{ grid:{color:'#f5f5f5'} }, y:{ beginAtZero:true, grid:{color:'#f5f5f5'} } } }
@@ -601,9 +601,9 @@ function showStudentMonthReport(studentId, month, autoPrint = false) {
               <div class="category-card" style="border-top:3px solid ${cat.color}">
                 <div class="category-name">${cat.label}</div>
                 <div class="category-scores">
-                  <div class="score-pill correct"><span class="score-val">${a?.categories[cat.id]?.correct||0}</span><span class="score-label">נכון</span></div>
+                  <div class="score-pill correct"><span class="score-val">${a?.categories[cat.id]?.correct||0}</span><span class="score-label">Correct</span></div>
                   <div style="color:var(--text-light);align-self:center">/</div>
-                  <div class="score-pill mistakes"><span class="score-val">${a?.categories[cat.id]?.mistakes||0}</span><span class="score-label">שגיאות</span></div>
+                  <div class="score-pill mistakes"><span class="score-val">${a?.categories[cat.id]?.mistakes||0}</span><span class="score-label">Mistakes</span></div>
                 </div>
               </div>`).join('')}
           </div>
@@ -718,7 +718,7 @@ function renderProviderProfile(providerId) {
       <div class="kpi-card"><div class="kpi-icon" style="background:var(--teal-50);color:var(--teal-600)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div><div class="kpi-value">${stats.students}</div><div class="kpi-label">תלמידים</div></div>
       <div class="kpi-card success"><div class="kpi-icon" style="background:var(--success-bg);color:var(--success)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/></svg></div><div class="kpi-value">${stats.improving}</div><div class="kpi-label">משתפרים</div></div>
       <div class="kpi-card danger"><div class="kpi-icon" style="background:var(--danger-bg);color:var(--danger)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/></svg></div><div class="kpi-value">${stats.struggling}</div><div class="kpi-label">Need Attention</div></div>
-      <div class="kpi-card gold"><div class="kpi-icon" style="background:var(--gold-100);color:var(--gold-600)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div><div class="kpi-value">${stats.assessments}</div><div class="kpi-label">הערכות שנה"ל</div></div>
+      <div class="kpi-card gold"><div class="kpi-icon" style="background:var(--gold-100);color:var(--gold-600)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div><div class="kpi-value">${stats.assessments}</div><div class="kpi-label">הערכות YTD</div></div>
     </div>
 
     <div class="grid-2 mb-6">
@@ -869,7 +869,7 @@ function generateWorksheet() {
                 <th rowspan="2">הערות</th>
               </tr>
               <tr>
-                ${CATEGORIES.map(() => `<th style="font-size:0.72rem;background:var(--teal-700)">נכון</th><th style="font-size:0.72rem;background:var(--teal-700);border-right:2px solid rgba(255,255,255,0.3)">שגיאות</th>`).join('')}
+                ${CATEGORIES.map(() => `<th style="font-size:0.72rem;background:var(--teal-700)">Correct</th><th style="font-size:0.72rem;background:var(--teal-700);border-right:2px solid rgba(255,255,255,0.3)">Mistakes</th>`).join('')}
               </tr>
             </thead>
             <tbody>
