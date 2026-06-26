@@ -1,385 +1,204 @@
 // ============================================================
-// KriahTrack — sql.js Database Layer (pure JS SQLite)
-// Data persists to disk as a binary file
+// KriahTrack — JSON File Database (lowdb v1)
+// Zero native dependencies — works on any platform
+// Data persists to db/kriahtrack.json
 // ============================================================
 const path = require('path');
 const fs   = require('fs');
 const { v4: uuidv4 } = require('uuid');
 
-const DB_PATH  = path.join(__dirname, '../db/kriahtrack.db');
-const SQL_WASM = path.join(__dirname, '../node_modules/sql.js/dist/sql-wasm.js');
+const DB_PATH = path.join(__dirname, '../db/kriahtrack.json');
 
-let _db   = null;
-let _SQL  = null;
-let _dirty = false;
+let _db = null;
 
-// Persist to disk every 5 seconds if dirty
-function startAutosave() {
-  setInterval(() => {
-    if (_dirty && _db) {
-      const data = _db.export();
-      fs.writeFileSync(DB_PATH, Buffer.from(data));
-      _dirty = false;
-    }
-  }, 5000);
+function getDb() { return _db; }
+
+function saveDb() {
+  fs.writeFileSync(DB_PATH, JSON.stringify(_db, null, 2), 'utf8');
 }
 
-function save() {
-  _dirty = true;
-}
+function initDb() {
+  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
 
-async function initDb() {
-  // Load sql.js
-  const initSqlJs = require(SQL_WASM);
-  _SQL = await initSqlJs();
-
-  // Load existing DB or create new
   if (fs.existsSync(DB_PATH)) {
-    const fileBuffer = fs.readFileSync(DB_PATH);
-    _db = new _SQL.Database(fileBuffer);
-  } else {
-    _db = new _SQL.Database();
+    try {
+      _db = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
+    } catch(e) {
+      console.warn('DB file corrupt, recreating...');
+      _db = null;
+    }
   }
 
-  // Create schema
-  _db.run(`PRAGMA foreign_keys = ON;`);
-  _db.run(`
-    CREATE TABLE IF NOT EXISTS providers (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      director TEXT NOT NULL,
-      email TEXT NOT NULL,
-      city TEXT DEFAULT '',
-      phone TEXT DEFAULT '',
-      classes TEXT DEFAULT '["א׳","ב׳"]',
-      created_at TEXT DEFAULT (datetime('now')),
-      updated_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE IF NOT EXISTS students (
-      id TEXT PRIMARY KEY,
-      first_name TEXT NOT NULL,
-      last_name TEXT NOT NULL,
-      provider_id TEXT NOT NULL,
-      class TEXT NOT NULL,
-      year TEXT DEFAULT 'תשפ״ו',
-      status TEXT DEFAULT 'active',
-      notes TEXT DEFAULT '',
-      created_at TEXT DEFAULT (datetime('now')),
-      updated_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE IF NOT EXISTS assessments (
-      id TEXT PRIMARY KEY,
-      student_id TEXT NOT NULL,
-      provider_id TEXT NOT NULL,
-      month TEXT NOT NULL,
-      year TEXT NOT NULL DEFAULT 'תשפ״ו',
-      source TEXT DEFAULT 'manual',
-      otiyot_correct INTEGER DEFAULT 0,
-      otiyot_mistakes INTEGER DEFAULT 0,
-      ot_nekuda_correct INTEGER DEFAULT 0,
-      ot_nekuda_mistakes INTEGER DEFAULT 0,
-      ot_nekuda_ot_correct INTEGER DEFAULT 0,
-      ot_nekuda_ot_mistakes INTEGER DEFAULT 0,
-      milim_correct INTEGER DEFAULT 0,
-      milim_mistakes INTEGER DEFAULT 0,
-      tehilim_correct INTEGER DEFAULT 0,
-      tehilim_mistakes INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT (datetime('now')),
-      updated_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_assess_unique ON assessments(student_id, month, year);
-    CREATE TABLE IF NOT EXISTS ocr_imports (
-      id TEXT PRIMARY KEY,
-      provider_id TEXT NOT NULL,
-      month TEXT NOT NULL,
-      year TEXT NOT NULL,
-      file_name TEXT DEFAULT '',
-      imported INTEGER DEFAULT 0,
-      skipped INTEGER DEFAULT 0,
-      overwritten INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE IF NOT EXISTS audit_log (
-      id TEXT PRIMARY KEY,
-      action TEXT NOT NULL,
-      entity TEXT NOT NULL,
-      entity_name TEXT NOT NULL,
-      field TEXT DEFAULT '',
-      before_val TEXT DEFAULT '',
-      after_val TEXT DEFAULT '',
-      user_name TEXT DEFAULT 'מנהל',
-      created_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE IF NOT EXISTS system_log (
-      id TEXT PRIMARY KEY,
-      type TEXT NOT NULL,
-      message TEXT NOT NULL,
-      user_name TEXT DEFAULT 'מנהל',
-      created_at TEXT DEFAULT (datetime('now'))
-    );
-  `);
+  if (!_db || !_db.providers) {
+    _db = { providers: [], students: [], assessments: [], ocrImports: [], auditLog: [], systemLog: [] };
+    seedData();
+    saveDb();
+  }
 
-  // Seed if empty
-  const count = queryOne('SELECT COUNT(*) as c FROM providers');
-  if (!count || count.c === 0) seedData();
-
-  // Save initial state
-  const data = _db.export();
-  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-  fs.writeFileSync(DB_PATH, Buffer.from(data));
-
-  startAutosave();
+  // Auto-save every 10 seconds
+  setInterval(saveDb, 10000);
   return _db;
-}
-
-// ---- QUERY HELPERS ----
-function query(sql, params = []) {
-  const stmt = _db.prepare(sql);
-  stmt.bind(params);
-  const rows = [];
-  while (stmt.step()) rows.push(stmt.getAsObject());
-  stmt.free();
-  return rows;
-}
-
-function queryOne(sql, params = []) {
-  const rows = query(sql, params);
-  return rows[0] || null;
-}
-
-function run(sql, params = []) {
-  _db.run(sql, params);
-  save();
 }
 
 // ---- SEED DATA ----
 function seedData() {
   const providers = [
-    { id:'p1', name:'בית ספר אהבת תורה',    director:'הרב משה לוי',    email:'moshe@ahavatorah.edu',  city:'בני ברק',  phone:'03-555-1234', classes:['א׳','ב׳','ג׳'] },
-    { id:'p2', name:'תלמוד תורה אור החיים',  director:'הרב אברהם כהן',  email:'avraham@orchaim.edu',   city:'ירושלים',  phone:'02-555-5678', classes:['א׳','ב׳'] },
-    { id:'p3', name:'ישיבה קטנה בית יעקב',   director:'הרב יצחק שפירא', email:'yitzchak@beitya.edu',   city:'אשדוד',    phone:'08-555-9012', classes:['א׳','ב׳','ג׳','ד׳'] },
-    { id:'p4', name:'חדר מרכזי ברסלב',       director:'הרב נחמן גרין',  email:'nachman@breslov.edu',   city:'צפת',      phone:'04-555-3456', classes:['א׳','ב׳'] },
+    { id:'p1', name:'בית ספר אהבת תורה',    director:'הרב משה לוי',    email:'moshe@ahavatorah.edu',  city:'בני ברק',  phone:'03-555-1234', classes:['א׳','ב׳','ג׳'],  createdAt: new Date().toISOString() },
+    { id:'p2', name:'תלמוד תורה אור החיים',  director:'הרב אברהם כהן',  email:'avraham@orchaim.edu',   city:'ירושלים',  phone:'02-555-5678', classes:['א׳','ב׳'],       createdAt: new Date().toISOString() },
+    { id:'p3', name:'ישיבה קטנה בית יעקב',   director:'הרב יצחק שפירא', email:'yitzchak@beitya.edu',   city:'אשדוד',    phone:'08-555-9012', classes:['א׳','ב׳','ג׳','ד׳'], createdAt: new Date().toISOString() },
+    { id:'p4', name:'חדר מרכזי ברסלב',       director:'הרב נחמן גרין',  email:'nachman@breslov.edu',   city:'צפת',      phone:'04-555-3456', classes:['א׳','ב׳'],       createdAt: new Date().toISOString() },
   ];
-  providers.forEach(p => run(
-    'INSERT INTO providers (id,name,director,email,city,phone,classes) VALUES (?,?,?,?,?,?,?)',
-    [p.id, p.name, p.director, p.email, p.city, p.phone, JSON.stringify(p.classes)]
-  ));
+  _db.providers = providers;
 
   const students = [
-    {id:'s1', fn:'יוסף',  ln:'כהן',      pid:'p1', cls:'א׳'},
-    {id:'s2', fn:'מנחם',  ln:'לוי',      pid:'p1', cls:'א׳'},
-    {id:'s3', fn:'אברהם', ln:'גולדברג',  pid:'p1', cls:'ב׳'},
-    {id:'s4', fn:'שמואל', ln:'רוזנברג',  pid:'p2', cls:'א׳'},
-    {id:'s5', fn:'דוד',   ln:'פרידמן',   pid:'p2', cls:'ב׳'},
-    {id:'s6', fn:'ישראל', ln:'ברגר',     pid:'p3', cls:'א׳'},
-    {id:'s7', fn:'מרדכי', ln:'שטיין',    pid:'p3', cls:'ב׳'},
-    {id:'s8', fn:'פנחס',  ln:'וייס',     pid:'p3', cls:'ג׳'},
-    {id:'s9', fn:'אליהו', ln:'שוורץ',    pid:'p4', cls:'א׳'},
-    {id:'s10',fn:'נחמן',  ln:'גרינבאום', pid:'p4', cls:'ב׳'},
-    {id:'s11',fn:'חיים',  ln:'בלום',     pid:'p1', cls:'ג׳'},
-    {id:'s12',fn:'זלמן',  ln:'הורוביץ',  pid:'p2', cls:'א׳'},
+    {id:'s1', firstName:'יוסף',  lastName:'כהן',      providerId:'p1', class:'א׳', year:'תשפ״ו', status:'active', notes:''},
+    {id:'s2', firstName:'מנחם',  lastName:'לוי',      providerId:'p1', class:'א׳', year:'תשפ״ו', status:'active', notes:''},
+    {id:'s3', firstName:'אברהם', lastName:'גולדברג',  providerId:'p1', class:'ב׳', year:'תשפ״ו', status:'active', notes:''},
+    {id:'s4', firstName:'שמואל', lastName:'רוזנברג',  providerId:'p2', class:'א׳', year:'תשפ״ו', status:'active', notes:''},
+    {id:'s5', firstName:'דוד',   lastName:'פרידמן',   providerId:'p2', class:'ב׳', year:'תשפ״ו', status:'active', notes:''},
+    {id:'s6', firstName:'ישראל', lastName:'ברגר',     providerId:'p3', class:'א׳', year:'תשפ״ו', status:'active', notes:''},
+    {id:'s7', firstName:'מרדכי', lastName:'שטיין',    providerId:'p3', class:'ב׳', year:'תשפ״ו', status:'active', notes:''},
+    {id:'s8', firstName:'פנחס',  lastName:'וייס',     providerId:'p3', class:'ג׳', year:'תשפ״ו', status:'active', notes:''},
+    {id:'s9', firstName:'אליהו', lastName:'שוורץ',    providerId:'p4', class:'א׳', year:'תשפ״ו', status:'active', notes:''},
+    {id:'s10',firstName:'נחמן',  lastName:'גרינבאום', providerId:'p4', class:'ב׳', year:'תשפ״ו', status:'active', notes:''},
+    {id:'s11',firstName:'חיים',  lastName:'בלום',     providerId:'p1', class:'ג׳', year:'תשפ״ו', status:'active', notes:''},
+    {id:'s12',firstName:'זלמן',  lastName:'הורוביץ',  providerId:'p2', class:'א׳', year:'תשפ״ו', status:'active', notes:''},
   ];
-  students.forEach(s => run(
-    'INSERT INTO students (id,first_name,last_name,provider_id,class,year) VALUES (?,?,?,?,?,?)',
-    [s.id, s.fn, s.ln, s.pid, s.cls, 'תשפ״ו']
-  ));
+  _db.students = students;
 
-  const months = ['tishrei','cheshvan','kislev','tevet','shvat','adar','nisan','iyar','sivan'];
+  const MONTH_ORDER = ['tishrei','cheshvan','kislev','tevet','shvat','adar','nisan','iyar','sivan'];
+  _db.assessments = [];
   students.forEach(s => {
     const base = 10 + Math.floor(Math.random()*12);
-    months.forEach((month, mi) => {
+    MONTH_ORDER.forEach((month, mi) => {
       if (Math.random() > 0.12) {
         const g = mi * 1.2;
         const n = () => Math.floor(Math.random()*4)-1;
-        try {
-          run(`INSERT OR IGNORE INTO assessments
-            (id,student_id,provider_id,month,year,source,
-             otiyot_correct,otiyot_mistakes,ot_nekuda_correct,ot_nekuda_mistakes,
-             ot_nekuda_ot_correct,ot_nekuda_ot_mistakes,milim_correct,milim_mistakes,
-             tehilim_correct,tehilim_mistakes)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-            [`a_${s.id}_${month}`, s.id, s.pid, month, 'תשפ״ו', 'manual',
-             Math.max(0,Math.min(30,Math.floor(base+g+n()+8))), Math.max(0,Math.floor(7-g*0.3+Math.abs(n()))),
-             Math.max(0,Math.min(28,Math.floor(base+g+n()+4))), Math.max(0,Math.floor(9-g*0.3+Math.abs(n()))),
-             Math.max(0,Math.min(25,Math.floor(base+g+n()))),   Math.max(0,Math.floor(11-g*0.3+Math.abs(n()))),
-             Math.max(0,Math.min(22,Math.floor(base+g+n()-2))), Math.max(0,Math.floor(9-g*0.3+Math.abs(n()))),
-             Math.max(0,Math.min(20,Math.floor(base+g+n()-4))), Math.max(0,Math.floor(7-g*0.3+Math.abs(n())))
-            ]);
-        } catch(e) {}
+        _db.assessments.push({
+          id: `a_${s.id}_${month}`,
+          studentId: s.id, providerId: s.providerId,
+          month, year: 'תשפ״ו', source: 'manual',
+          createdAt: new Date().toISOString(),
+          categories: {
+            otiyot:       { correct: Math.max(0,Math.min(30,Math.floor(base+g+n()+8))), mistakes: Math.max(0,Math.floor(7-g*0.3+Math.abs(n()))) },
+            ot_nekuda:    { correct: Math.max(0,Math.min(28,Math.floor(base+g+n()+4))), mistakes: Math.max(0,Math.floor(9-g*0.3+Math.abs(n()))) },
+            ot_nekuda_ot: { correct: Math.max(0,Math.min(25,Math.floor(base+g+n()))),   mistakes: Math.max(0,Math.floor(11-g*0.3+Math.abs(n()))) },
+            milim:        { correct: Math.max(0,Math.min(22,Math.floor(base+g+n()-2))), mistakes: Math.max(0,Math.floor(9-g*0.3+Math.abs(n()))) },
+            tehilim:      { correct: Math.max(0,Math.min(20,Math.floor(base+g+n()-4))), mistakes: Math.max(0,Math.floor(7-g*0.3+Math.abs(n()))) },
+          }
+        });
       }
     });
   });
 
-  run('INSERT INTO system_log (id,type,message,user_name) VALUES (?,?,?,?)',
-    [uuidv4(),'success','מערכת KriahTrack אותחלה בהצלחה','מערכת']);
-  run('INSERT INTO system_log (id,type,message,user_name) VALUES (?,?,?,?)',
-    [uuidv4(),'info','נתוני דמו נטענו — 12 תלמידים, 4 ספקים','מערכת']);
+  _db.systemLog = [
+    { id: uuidv4(), type:'success', message:'מערכת KriahTrack אותחלה בהצלחה', user_name:'מערכת', created_at: new Date().toISOString() },
+    { id: uuidv4(), type:'info',    message:'נתוני דמו נטענו — 12 תלמידים, 4 ספקים', user_name:'מערכת', created_at: new Date().toISOString() },
+  ];
+  _db.auditLog = [];
+  _db.ocrImports = [];
 }
 
-// ---- ROW NORMALIZER ----
-function rowToAssessment(row) {
-  if (!row) return null;
-  return {
-    ...row,
-    categories: {
-      otiyot:       { correct: row.otiyot_correct||0,       mistakes: row.otiyot_mistakes||0 },
-      ot_nekuda:    { correct: row.ot_nekuda_correct||0,    mistakes: row.ot_nekuda_mistakes||0 },
-      ot_nekuda_ot: { correct: row.ot_nekuda_ot_correct||0, mistakes: row.ot_nekuda_ot_mistakes||0 },
-      milim:        { correct: row.milim_correct||0,        mistakes: row.milim_mistakes||0 },
-      tehilim:      { correct: row.tehilim_correct||0,      mistakes: row.tehilim_mistakes||0 },
-    }
-  };
+// ---- HELPERS ----
+function addAuditLog(action, entity, entityName, field, before, after) {
+  _db.auditLog.unshift({ id:uuidv4(), action, entity, entity_name:entityName, field:field||'', before_val:String(before||''), after_val:String(after||''), user_name:'מנהל', created_at:new Date().toISOString() });
+  if (_db.auditLog.length > 500) _db.auditLog = _db.auditLog.slice(0,500);
+  saveDb();
 }
-
-const MONTH_ORDER = 'CASE month WHEN "tishrei" THEN 1 WHEN "cheshvan" THEN 2 WHEN "kislev" THEN 3 WHEN "tevet" THEN 4 WHEN "shvat" THEN 5 WHEN "adar" THEN 6 WHEN "nisan" THEN 7 WHEN "iyar" THEN 8 WHEN "sivan" THEN 9 WHEN "tamuz" THEN 10 WHEN "av" THEN 11 WHEN "elul" THEN 12 END';
+function addSystemLog(type, message, user) {
+  _db.systemLog.unshift({ id:uuidv4(), type, message, user_name:user||'מנהל', created_at:new Date().toISOString() });
+  if (_db.systemLog.length > 500) _db.systemLog = _db.systemLog.slice(0,500);
+  saveDb();
+}
+function getSystemLogs(limit=100) { return _db.systemLog.slice(0,limit); }
+function getAuditLogs(limit=100)  { return _db.auditLog.slice(0,limit); }
 
 // ---- PROVIDERS ----
-function getAllProviders() {
-  return query('SELECT * FROM providers ORDER BY name').map(p => ({ ...p, classes: JSON.parse(p.classes||'[]') }));
-}
-function getProviderById(id) {
-  const p = queryOne('SELECT * FROM providers WHERE id=?', [id]);
-  if (p) p.classes = JSON.parse(p.classes||'[]');
-  return p;
-}
+function getAllProviders() { return [..._db.providers].sort((a,b)=>a.name.localeCompare(b.name)); }
+function getProviderById(id) { return _db.providers.find(p=>p.id===id)||null; }
 function createProvider(data) {
-  const id = uuidv4();
-  run('INSERT INTO providers (id,name,director,email,city,phone,classes) VALUES (?,?,?,?,?,?,?)',
-    [id, data.name, data.director, data.email, data.city||'', data.phone||'', JSON.stringify(data.classes||['א׳','ב׳'])]);
+  const p = { id:uuidv4(), name:data.name, director:data.director, email:data.email, city:data.city||'', phone:data.phone||'', classes:data.classes||['א׳','ב׳'], createdAt:new Date().toISOString() };
+  _db.providers.push(p);
   addAuditLog('הוספת ספק','ספק',data.name,'—','—','נוצר');
   addSystemLog('info',`ספק חדש נוסף: ${data.name}`);
-  return getProviderById(id);
+  saveDb(); return p;
 }
 function updateProvider(id, data) {
-  run('UPDATE providers SET name=?,director=?,email=?,city=?,phone=?,updated_at=datetime("now") WHERE id=?',
-    [data.name, data.director, data.email, data.city||'', data.phone||'', id]);
-  return getProviderById(id);
+  const idx = _db.providers.findIndex(p=>p.id===id);
+  if (idx<0) return null;
+  _db.providers[idx] = { ..._db.providers[idx], ...data, id, updatedAt:new Date().toISOString() };
+  saveDb(); return _db.providers[idx];
 }
 
 // ---- STUDENTS ----
-function getAllStudents() {
-  return query('SELECT * FROM students ORDER BY last_name, first_name');
-}
-function getStudentById(id) {
-  return queryOne('SELECT * FROM students WHERE id=?', [id]);
-}
-function getStudentsByProvider(providerId) {
-  return query('SELECT * FROM students WHERE provider_id=? ORDER BY last_name,first_name', [providerId]);
-}
+function getAllStudents() { return [..._db.students].sort((a,b)=>a.lastName.localeCompare(b.lastName)); }
+function getStudentById(id) { return _db.students.find(s=>s.id===id)||null; }
+function getStudentsByProvider(providerId) { return _db.students.filter(s=>s.providerId===providerId); }
 function createStudent(data) {
-  const id = uuidv4();
-  run('INSERT INTO students (id,first_name,last_name,provider_id,class,year,notes) VALUES (?,?,?,?,?,?,?)',
-    [id, data.firstName, data.lastName, data.providerId, data.class, data.year||'תשפ״ו', data.notes||'']);
+  const s = { id:uuidv4(), firstName:data.firstName, lastName:data.lastName, providerId:data.providerId, class:data.class, year:data.year||'תשפ״ו', status:'active', notes:data.notes||'', createdAt:new Date().toISOString() };
+  _db.students.push(s);
   addAuditLog('הוספת תלמיד','תלמיד',`${data.firstName} ${data.lastName}`,'—','—','נוצר');
   addSystemLog('info',`תלמיד חדש נוסף: ${data.firstName} ${data.lastName}`);
-  return getStudentById(id);
+  saveDb(); return s;
 }
 function updateStudent(id, data) {
-  run('UPDATE students SET first_name=?,last_name=?,provider_id=?,class=?,notes=?,updated_at=datetime("now") WHERE id=?',
-    [data.firstName, data.lastName, data.providerId, data.class, data.notes||'', id]);
-  return getStudentById(id);
+  const idx = _db.students.findIndex(s=>s.id===id);
+  if (idx<0) return null;
+  _db.students[idx] = { ..._db.students[idx], ...data, id, updatedAt:new Date().toISOString() };
+  saveDb(); return _db.students[idx];
 }
 function deleteStudent(id) {
   const s = getStudentById(id);
-  run('DELETE FROM assessments WHERE student_id=?', [id]);
-  run('DELETE FROM students WHERE id=?', [id]);
-  if (s) addAuditLog('מחיקת תלמיד','תלמיד',`${s.first_name} ${s.last_name}`,'—','קיים','נמחק');
+  _db.students = _db.students.filter(x=>x.id!==id);
+  _db.assessments = _db.assessments.filter(a=>a.studentId!==id);
+  if (s) addAuditLog('מחיקת תלמיד','תלמיד',`${s.firstName} ${s.lastName}`,'—','קיים','נמחק');
+  saveDb();
 }
 
 // ---- ASSESSMENTS ----
+const MONTH_ORDER_MAP = {tishrei:1,cheshvan:2,kislev:3,tevet:4,shvat:5,adar:6,nisan:7,iyar:8,sivan:9,tamuz:10,av:11,elul:12};
 function getAssessmentsByStudent(studentId) {
-  return query(`SELECT * FROM assessments WHERE student_id=? ORDER BY ${MONTH_ORDER}`, [studentId]).map(rowToAssessment);
+  return _db.assessments.filter(a=>a.studentId===studentId).sort((a,b)=>(MONTH_ORDER_MAP[a.month]||0)-(MONTH_ORDER_MAP[b.month]||0));
 }
-function getAssessmentsByProvider(providerId) {
-  return query('SELECT * FROM assessments WHERE provider_id=?', [providerId]).map(rowToAssessment);
-}
-function getAllAssessments() {
-  return query('SELECT * FROM assessments').map(rowToAssessment);
-}
-function getAssessmentsByMonth(month, year) {
-  return query('SELECT * FROM assessments WHERE month=? AND year=?', [month, year]).map(rowToAssessment);
-}
+function getAssessmentsByProvider(providerId) { return _db.assessments.filter(a=>a.providerId===providerId); }
+function getAllAssessments() { return _db.assessments; }
+function getAssessmentsByMonth(month,year) { return _db.assessments.filter(a=>a.month===month&&a.year===year); }
 function upsertAssessment(data) {
-  const cats = data.categories;
-  const existing = queryOne('SELECT id FROM assessments WHERE student_id=? AND month=? AND year=?',
-    [data.studentId, data.month, data.year||'תשפ״ו']);
-  if (existing) {
-    run(`UPDATE assessments SET source=?,
-      otiyot_correct=?,otiyot_mistakes=?,ot_nekuda_correct=?,ot_nekuda_mistakes=?,
-      ot_nekuda_ot_correct=?,ot_nekuda_ot_mistakes=?,milim_correct=?,milim_mistakes=?,
-      tehilim_correct=?,tehilim_mistakes=?,updated_at=datetime('now') WHERE id=?`,
-      [data.source||'manual',
-       cats.otiyot.correct, cats.otiyot.mistakes,
-       cats.ot_nekuda.correct, cats.ot_nekuda.mistakes,
-       cats.ot_nekuda_ot.correct, cats.ot_nekuda_ot.mistakes,
-       cats.milim.correct, cats.milim.mistakes,
-       cats.tehilim.correct, cats.tehilim.mistakes,
-       existing.id]);
+  const idx = _db.assessments.findIndex(a=>a.studentId===data.studentId&&a.month===data.month&&a.year===(data.year||'תשפ״ו'));
+  if (idx>=0) {
+    _db.assessments[idx] = { ..._db.assessments[idx], categories:data.categories, source:data.source||'manual', updatedAt:new Date().toISOString() };
     addAuditLog('עדכון הערכה','הערכה',data.studentName||'תלמיד','חודש',data.month,'עודכן');
-    return { id: existing.id, updated: true };
+    saveDb(); return { id:_db.assessments[idx].id, updated:true };
   } else {
-    const id = uuidv4();
-    run(`INSERT INTO assessments
-      (id,student_id,provider_id,month,year,source,
-       otiyot_correct,otiyot_mistakes,ot_nekuda_correct,ot_nekuda_mistakes,
-       ot_nekuda_ot_correct,ot_nekuda_ot_mistakes,milim_correct,milim_mistakes,
-       tehilim_correct,tehilim_mistakes)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [id, data.studentId, data.providerId||'', data.month, data.year||'תשפ״ו', data.source||'manual',
-       cats.otiyot.correct, cats.otiyot.mistakes,
-       cats.ot_nekuda.correct, cats.ot_nekuda.mistakes,
-       cats.ot_nekuda_ot.correct, cats.ot_nekuda_ot.mistakes,
-       cats.milim.correct, cats.milim.mistakes,
-       cats.tehilim.correct, cats.tehilim.mistakes]);
+    const a = { id:uuidv4(), studentId:data.studentId, providerId:data.providerId||'', month:data.month, year:data.year||'תשפ״ו', source:data.source||'manual', createdAt:new Date().toISOString(), categories:data.categories };
+    _db.assessments.push(a);
     addAuditLog('הוספת הערכה','הערכה',data.studentName||'תלמיד','חודש','—',data.month);
-    return { id, updated: false };
+    saveDb(); return { id:a.id, updated:false };
   }
 }
 function deleteAssessment(id) {
-  const a = queryOne('SELECT * FROM assessments WHERE id=?', [id]);
-  run('DELETE FROM assessments WHERE id=?', [id]);
-  if (a) addAuditLog('מחיקת הערכה','הערכה',a.student_id,'חודש',a.month,'נמחק');
+  const a = _db.assessments.find(x=>x.id===id);
+  _db.assessments = _db.assessments.filter(x=>x.id!==id);
+  if (a) addAuditLog('מחיקת הערכה','הערכה',a.studentId,'חודש',a.month,'נמחק');
+  saveDb();
 }
 
 // ---- OCR IMPORTS ----
 function saveOCRImport(data) {
-  const id = uuidv4();
-  run('INSERT INTO ocr_imports (id,provider_id,month,year,file_name,imported,skipped,overwritten) VALUES (?,?,?,?,?,?,?,?)',
-    [id, data.providerId, data.month, data.year||'תשפ״ו', data.fileName||'', data.imported||0, data.skipped||0, data.overwritten||0]);
-  return id;
+  const imp = { id:uuidv4(), provider_id:data.providerId, month:data.month, year:data.year||'תשפ״ו', file_name:data.fileName||'', imported:data.imported||0, skipped:data.skipped||0, overwritten:data.overwritten||0, created_at:new Date().toISOString() };
+  _db.ocrImports.unshift(imp);
+  addSystemLog('success',`OCR ייבוא — ${data.imported} יובאו, ${data.skipped} דולגו`);
+  saveDb(); return imp.id;
 }
-function getAllOCRImports() {
-  return query('SELECT * FROM ocr_imports ORDER BY created_at DESC');
-}
-
-// ---- LOGS ----
-function addAuditLog(action, entity, entityName, field, before, after) {
-  run('INSERT INTO audit_log (id,action,entity,entity_name,field,before_val,after_val) VALUES (?,?,?,?,?,?,?)',
-    [uuidv4(), action, entity, entityName, field||'', String(before||''), String(after||'')]);
-}
-function addSystemLog(type, message, user) {
-  run('INSERT INTO system_log (id,type,message,user_name) VALUES (?,?,?,?)',
-    [uuidv4(), type, message, user||'מנהל']);
-}
-function getSystemLogs(limit=100) {
-  return query('SELECT * FROM system_log ORDER BY created_at DESC LIMIT ?', [limit]);
-}
-function getAuditLogs(limit=100) {
-  return query('SELECT * FROM audit_log ORDER BY created_at DESC LIMIT ?', [limit]);
-}
+function getAllOCRImports() { return _db.ocrImports; }
 
 // ---- BACKUP ----
 function exportAll() {
-  return {
-    exportedAt: new Date().toISOString(),
-    providers:   getAllProviders(),
-    students:    getAllStudents(),
-    assessments: getAllAssessments(),
-  };
+  return { exportedAt:new Date().toISOString(), providers:getAllProviders(), students:getAllStudents(), assessments:getAllAssessments() };
 }
 
 module.exports = {
-  initDb,
+  initDb, getDb,
   getAllProviders, getProviderById, createProvider, updateProvider,
   getAllStudents, getStudentById, getStudentsByProvider, createStudent, updateStudent, deleteStudent,
   getAssessmentsByStudent, getAssessmentsByProvider, getAllAssessments, getAssessmentsByMonth,

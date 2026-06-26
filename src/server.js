@@ -28,16 +28,15 @@ const upload = multer({
   }
 });
 
-// Init DB (async with sql.js)
-(async () => {
-  await db.initDb();
-  console.log('✅ Database initialized');
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`\n🚀 KriahTrack running at http://localhost:${PORT}`);
-    console.log(`📁 Database: kriahtrack-server/db/kriahtrack.db`);
-    console.log(`🌐 Open in browser: http://localhost:${PORT}\n`);
-  });
-})();
+// Init DB
+db.initDb();
+console.log('✅ Database initialized');
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`\n🚀 KriahTrack running at http://localhost:${PORT}`);
+  console.log(`📁 Data saved to: kriahtrack-server/db/kriahtrack.json`);
+  console.log(`🌐 Open in browser: http://localhost:${PORT}\n`);
+});
 
 // ============================================================
 // API ROUTES
