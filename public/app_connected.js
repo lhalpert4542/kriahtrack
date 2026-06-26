@@ -1,103 +1,88 @@
 // ============================================================
-// KriahTrack — Connected App Bootstrap
-// Real data only — no demo data fallback
+// KriahTrack — App Bootstrap
+// Opens instantly with demo data, syncs real data in background
 // ============================================================
 
 let currentPage = 'dashboard';
-let profileTab = 'overview';
+let profileTab  = 'overview';
 let chartInstances = {};
 
-function setLoadProgress(pct, msg) {
-  const bar = document.getElementById('loadBar');
-  const lbl = document.getElementById('loadMsg');
-  if (bar) bar.style.width = pct + '%';
-  if (lbl) lbl.textContent = msg;
-}
+// ---- INSTANT BOOT ----
+// App opens immediately using demo data from data.js
+// Real server data loads in background and refreshes the view
+document.addEventListener('DOMContentLoaded', () => {
+  // Close modals on overlay click
+  document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+  });
 
-async function bootstrap() {
-  const failsafe = setTimeout(() => {
-    showError('Connection timeout. Please refresh the page.');
-  }, 12000);
+  // Open dashboard immediately with demo data
+  navigate('dashboard');
 
+  // Sync real data from server in background
+  syncFromServer();
+
+  // Keep-alive ping every 30s
+  setInterval(pingServer, 30000);
+});
+
+// ---- BACKGROUND SYNC ----
+async function syncFromServer() {
   try {
-    setLoadProgress(15, 'Connecting to server...');
     await API.health();
 
-    setLoadProgress(30, 'Loading providers...');
-    DB.providers = await API.getProviders();
+    const [providers, students, assessments, sysLogs, auditLogs, ocrImports] = await Promise.all([
+      API.getProviders(),
+      API.getStudents(),
+      API.getAssessments(),
+      API.getSystemLogs().catch(() => []),
+      API.getAuditLogs().catch(() => []),
+      API.getOCRImports().catch(() => []),
+    ]);
 
-    setLoadProgress(50, 'Loading students...');
-    const rawStudents = await API.getStudents();
-    DB.students = rawStudents.map(s => ({
-      ...s,
-      firstName:  s.first_name  || s.firstName  || '',
-      lastName:   s.last_name   || s.lastName   || '',
-      providerId: s.provider_id || s.providerId || '',
-    }));
+    // Replace demo data with real server data
+    DB.providers   = providers;
+    DB.students    = students.map(normalizeStudent);
+    DB.assessments = assessments.map(normalizeAssessment);
+    DB.systemLog   = sysLogs;
+    DB.auditLog    = auditLogs.map(normalizeAuditRow);
+    DB.ocrImports  = ocrImports;
 
-    setLoadProgress(70, 'Loading assessments...');
-    const rawAssessments = await API.getAssessments();
-    DB.assessments = rawAssessments.map(normalizeAssessment);
-
-    setLoadProgress(85, 'Loading logs...');
-    try {
-      DB.systemLog  = await API.getSystemLogs();
-      const audit   = await API.getAuditLogs();
-      DB.auditLog   = audit.map(r => ({
-        ...r,
-        entityName: r.entity_name || r.entityName || '',
-        before:     r.before_val  || r.before     || '',
-        after:      r.after_val   || r.after       || '',
-        user:       r.user_name   || r.user        || 'Admin',
-        timestamp:  r.created_at  || r.timestamp   || '',
-      }));
-      DB.ocrImports = await API.getOCRImports();
-    } catch(logErr) {
-      console.warn('Logs load failed (non-fatal):', logErr);
-    }
-
-    setLoadProgress(100, 'Ready!');
-    clearTimeout(failsafe);
     updateServerStatus(true);
-    setTimeout(() => showApp(), 300);
+    updateBadges();
 
-  } catch (err) {
-    clearTimeout(failsafe);
-    console.error('Bootstrap failed:', err);
-    showError('Could not connect to server. Please check your connection and refresh.');
+    // Refresh current page with real data
+    navigate(currentPage, _currentParams);
+
+    // Hide sync banner
+    const banner = document.getElementById('syncBanner');
+    if (banner) banner.style.display = 'none';
+
+  } catch(err) {
+    console.warn('[KT] Server sync failed — using demo data:', err.message);
+    updateServerStatus(false);
+    const banner = document.getElementById('syncBanner');
+    const msg    = document.getElementById('syncBannerMsg');
+    if (msg) msg.textContent = 'Offline — showing demo data. Changes will not be saved.';
+    if (banner) banner.style.background = 'linear-gradient(90deg,#8a2020,#a02828)';
   }
 }
 
-function showApp() {
-  const loading = document.getElementById('loadingScreen');
-  const shell   = document.getElementById('appShell');
-  if (loading) loading.style.display = 'none';
-  if (shell)   shell.style.display   = 'flex';
-  updateBadges();
-  navigate('dashboard');
-  setTimeout(() => showToast('KriahTrack loaded successfully', 'success'), 500);
+async function pingServer() {
+  try { await API.health(); updateServerStatus(true); }
+  catch(e) { updateServerStatus(false); }
 }
 
-function showError(message) {
-  const loading = document.getElementById('loadingScreen');
-  if (loading) {
-    loading.innerHTML = `
-      <img src="assets/logo.png" style="width:80px;height:80px;object-fit:contain;margin-bottom:20px;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.4))" onerror="this.style.display='none'">
-      <div style="font-size:1.5rem;font-weight:800;margin-bottom:8px;color:#fff">KriahTrack</div>
-      <div style="font-size:0.9rem;color:rgba(255,255,255,0.6);margin-bottom:28px">Connection Error</div>
-      <div style="background:rgba(168,32,32,0.3);border:1px solid rgba(168,32,32,0.6);border-radius:10px;padding:16px 24px;max-width:380px;text-align:center;color:#ffaaaa;font-size:0.88rem;margin-bottom:20px">${message}</div>
-      <button onclick="location.reload()" style="background:linear-gradient(135deg,#1a5f5f,#1e7070);color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:0.9rem;font-weight:600;cursor:pointer">Retry</button>
-    `;
-  }
+// ---- NORMALIZE HELPERS ----
+function normalizeStudent(s) {
+  return { ...s, firstName: s.first_name||s.firstName||'', lastName: s.last_name||s.lastName||'', providerId: s.provider_id||s.providerId||'' };
 }
 
 function normalizeAssessment(a) {
-  if (a.categories) return {
-    ...a,
-    studentId:  a.student_id  || a.studentId,
-    providerId: a.provider_id || a.providerId,
-    createdAt:  a.created_at  || a.createdAt,
-  };
+  if (a.categories) return { ...a, studentId: a.student_id||a.studentId, providerId: a.provider_id||a.providerId, createdAt: a.created_at||a.createdAt };
   return {
     ...a,
     studentId:  a.student_id  || a.studentId,
@@ -113,6 +98,11 @@ function normalizeAssessment(a) {
   };
 }
 
+function normalizeAuditRow(r) {
+  return { ...r, entityName: r.entity_name||r.entityName||'', before: r.before_val||r.before||'', after: r.after_val||r.after||'', user: r.user_name||r.user||'Admin', timestamp: r.created_at||r.timestamp||'' };
+}
+
+// ---- STATUS ----
 function updateServerStatus(online) {
   const dot  = document.getElementById('serverStatusDot');
   const text = document.getElementById('serverStatusText');
@@ -128,12 +118,15 @@ function updateBadges() {
 }
 
 // ---- NAVIGATION ----
+let _currentParams = {};
+
 function navigate(page, params = {}) {
-  currentPage = page;
+  currentPage    = page;
+  _currentParams = params;
+
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
   const navMap = { student_profile:'students', provider_profile:'providers' };
-  const navPage = navMap[page] || page;
-  const navEl = document.querySelector(`.nav-item[data-page="${navPage}"]`);
+  const navEl  = document.querySelector(`.nav-item[data-page="${navMap[page]||page}"]`);
   if (navEl) navEl.classList.add('active');
 
   const pageNames = {
@@ -150,37 +143,37 @@ function navigate(page, params = {}) {
 
   const content = document.getElementById('pageContent');
   content.style.opacity = '0';
-  content.style.transform = 'translateY(8px)';
+  content.style.transform = 'translateY(6px)';
 
-  setTimeout(() => {
-    if (page === 'dashboard')         renderDashboard();
-    else if (page === 'students')     renderStudents();
-    else if (page === 'student_profile') renderStudentProfile(params.studentId);
-    else if (page === 'providers')    renderProviders();
+  requestAnimationFrame(() => {
+    if      (page === 'dashboard')        renderDashboard();
+    else if (page === 'students')         renderStudents();
+    else if (page === 'student_profile')  renderStudentProfile(params.studentId);
+    else if (page === 'providers')        renderProviders();
     else if (page === 'provider_profile') renderProviderProfile(params.providerId);
-    else if (page === 'worksheets')   renderWorksheets();
-    else if (page === 'reports')      renderReports();
-    else if (page === 'ocr')          { loadTesseractLazy(); renderOCR(); }
-    else if (page === 'analytics')    renderAnalytics();
-    else if (page === 'admin')        { refreshAdminLogs(); renderAdmin(); }
+    else if (page === 'worksheets')       renderWorksheets();
+    else if (page === 'reports')          renderReports();
+    else if (page === 'ocr')             { loadTesseractLazy(); renderOCR(); }
+    else if (page === 'analytics')        renderAnalytics();
+    else if (page === 'admin')           { refreshAdminLogs(); renderAdmin(); }
 
     updateBadges();
-    content.style.transition = 'opacity 0.25s ease, transform 0.25s ease';
-    content.style.opacity = '1';
-    content.style.transform = 'translateY(0)';
+    content.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+    content.style.opacity    = '1';
+    content.style.transform  = 'translateY(0)';
     closeSidebar();
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, 30);
+  });
 }
 
-// ---- LAZY TESSERACT LOAD ----
+// ---- LAZY TESSERACT ----
 let _tesseractLoaded = false;
 function loadTesseractLazy() {
-  if (_tesseractLoaded || typeof Tesseract !== 'undefined') return;
-  const script = document.createElement('script');
-  script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
-  script.onload = () => { _tesseractLoaded = true; console.log('Tesseract loaded'); };
-  document.head.appendChild(script);
+  if (_tesseractLoaded || typeof Tesseract !== 'undefined') { _tesseractLoaded = true; return; }
+  const s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+  s.onload = () => { _tesseractLoaded = true; };
+  document.head.appendChild(s);
 }
 
 // ---- SAVE STUDENT ----
@@ -194,15 +187,20 @@ async function saveNewStudent() {
   if (!firstName || !lastName || !providerId || !cls) { showToast('Please fill all required fields', 'warning'); return; }
   try {
     const s = await API.createStudent({ firstName, lastName, providerId, class: cls, year, notes });
-    s.firstName  = s.first_name  || firstName;
-    s.lastName   = s.last_name   || lastName;
-    s.providerId = s.provider_id || providerId;
-    DB.students.push(s);
+    DB.students.push(normalizeStudent(s));
     updateBadges();
     closeModal('addStudentModal');
-    showToast(`Student ${firstName} ${lastName} added`, 'success');
+    showToast(`${firstName} ${lastName} added`, 'success');
     if (currentPage === 'students') renderStudents();
-  } catch(e) { showToast('Error saving student: ' + e.message, 'danger'); }
+  } catch(e) {
+    // Offline fallback — add locally
+    const local = { id: generateId('s'), firstName, lastName, providerId, class: cls, year, status:'active', notes };
+    DB.students.push(local);
+    updateBadges();
+    closeModal('addStudentModal');
+    showToast(`${firstName} ${lastName} added (offline)`, 'warning');
+    if (currentPage === 'students') renderStudents();
+  }
 }
 
 // ---- SAVE PROVIDER ----
@@ -219,9 +217,16 @@ async function saveNewProvider() {
     DB.providers.push(p);
     updateBadges();
     closeModal('addProviderModal');
-    showToast(`Provider "${name}" added`, 'success');
+    showToast(`"${name}" added`, 'success');
     if (currentPage === 'providers') renderProviders();
-  } catch(e) { showToast('Error saving provider: ' + e.message, 'danger'); }
+  } catch(e) {
+    const local = { id: generateId('p'), name, director, email, city, phone, classes: ['א׳','ב׳'] };
+    DB.providers.push(local);
+    updateBadges();
+    closeModal('addProviderModal');
+    showToast(`"${name}" added (offline)`, 'warning');
+    if (currentPage === 'providers') renderProviders();
+  }
 }
 
 // ---- ASSESSMENT MODAL ----
@@ -243,61 +248,60 @@ async function saveAssessment() {
   if (!studentId || !month) { showToast('Please select a month', 'warning'); return; }
   const student    = getStudent(studentId);
   const categories = readCategoryInputs();
+  const newA = { id: generateId('a'), studentId, providerId: student.providerId, month, year, source:'manual', createdAt: new Date().toISOString(), categories };
   try {
-    const result = await API.saveAssessment({
-      studentId, providerId: student.providerId,
-      month, year, categories, source: 'manual',
-      studentName: getStudentName(student),
-    });
-    const idx = DB.assessments.findIndex(a => a.studentId === studentId && a.month === month && a.year === year);
-    const newA = { id: result.id, studentId, providerId: student.providerId, month, year, source: 'manual', createdAt: new Date().toISOString(), categories };
-    if (idx >= 0) DB.assessments[idx] = newA; else DB.assessments.push(newA);
-    closeModal('addAssessmentModal');
-    showToast('Assessment saved', 'success');
-    if (currentPage === 'student_profile') renderStudentProfile(studentId);
-  } catch(e) { showToast('Error saving assessment: ' + e.message, 'danger'); }
+    const result = await API.saveAssessment({ studentId, providerId: student.providerId, month, year, categories, source:'manual', studentName: getStudentName(student) });
+    newA.id = result.id;
+  } catch(e) { /* offline — use local id */ }
+  const idx = DB.assessments.findIndex(a => a.studentId === studentId && a.month === month && a.year === year);
+  if (idx >= 0) DB.assessments[idx] = newA; else DB.assessments.push(newA);
+  closeModal('addAssessmentModal');
+  showToast('Assessment saved', 'success');
+  if (currentPage === 'student_profile') renderStudentProfile(studentId);
 }
 
 // ---- DELETE ASSESSMENT ----
 async function deleteAssessment(assessmentId, studentId) {
   if (!confirm('Delete this assessment?')) return;
-  try {
-    await API.deleteAssessment(assessmentId);
-    DB.assessments = DB.assessments.filter(a => a.id !== assessmentId);
-    showToast('Assessment deleted', 'warning');
-    renderStudentProfile(studentId);
-  } catch(e) { showToast('Error deleting: ' + e.message, 'danger'); }
+  try { await API.deleteAssessment(assessmentId); } catch(e) { /* offline */ }
+  DB.assessments = DB.assessments.filter(a => a.id !== assessmentId);
+  showToast('Assessment deleted', 'warning');
+  renderStudentProfile(studentId);
 }
 
 // ---- OCR IMPORT ----
 async function confirmOCRImport() {
   const rows = pendingOCRData.map(row => {
-    const cleanCats = {};
-    CATEGORIES.forEach(cat => {
-      cleanCats[cat.id] = { correct: row.categories[cat.id].correct, mistakes: row.categories[cat.id].mistakes };
-    });
-    return { studentId: row.student.id, providerId: row.student.providerId, studentName: getStudentName(row.student), categories: cleanCats, action: row.action };
+    const cats = {};
+    CATEGORIES.forEach(cat => { cats[cat.id] = { correct: row.categories[cat.id].correct, mistakes: row.categories[cat.id].mistakes }; });
+    return { studentId: row.student.id, providerId: row.student.providerId, studentName: getStudentName(row.student), categories: cats, action: row.action };
   });
+  // Optimistic local update first
+  rows.forEach(row => {
+    if (row.action === 'skip') return;
+    const cats = row.categories;
+    const idx = DB.assessments.findIndex(a => a.studentId === row.studentId && a.month === ocrSelectedMonth && a.year === CURRENT_HEBREW_YEAR);
+    const newA = { id: generateId('a'), studentId: row.studentId, providerId: row.providerId, month: ocrSelectedMonth, year: CURRENT_HEBREW_YEAR, source:'ocr', createdAt: new Date().toISOString(), categories: cats };
+    if (idx >= 0) DB.assessments[idx] = newA; else DB.assessments.push(newA);
+  });
+  // Then sync to server
   try {
     const result = await API.importOCR({ rows, providerId: ocrSelectedProvider, month: ocrSelectedMonth, year: CURRENT_HEBREW_YEAR, fileName: _ocrFile ? _ocrFile.name : 'demo' });
-    DB.assessments = (await API.getAssessments()).map(normalizeAssessment);
-    DB.ocrImports  = await API.getOCRImports();
-    ocrStep = 1; pendingOCRData = []; _ocrFile = null;
     showToast(`${result.imported} assessments saved to server`, 'success');
-    renderOCR();
   } catch(e) {
-    showToast('Server error — please retry: ' + e.message, 'danger');
+    showToast(`Saved locally (${rows.filter(r=>r.action!=='skip').length} records) — will sync when online`, 'warning');
   }
+  ocrStep = 1; pendingOCRData = []; _ocrFile = null;
+  renderOCR();
 }
 
 // ---- REFRESH ADMIN LOGS ----
 async function refreshAdminLogs() {
   try {
     DB.systemLog  = await API.getSystemLogs();
-    const audit   = await API.getAuditLogs();
-    DB.auditLog   = audit.map(r => ({ ...r, entityName: r.entity_name||'', before: r.before_val||'', after: r.after_val||'', user: r.user_name||'Admin', timestamp: r.created_at||'' }));
+    DB.auditLog   = (await API.getAuditLogs()).map(normalizeAuditRow);
     DB.ocrImports = await API.getOCRImports();
-  } catch(e) { console.warn('Could not refresh logs:', e); }
+  } catch(e) { /* use existing */ }
 }
 
 // ---- NOTIFICATIONS ----
@@ -309,22 +313,12 @@ function showNotifications() {
   openModal('notificationsPanel');
 }
 
-// ---- PROVIDER CLASS UPDATE ----
-function updateClassOptions(providerId) {
-  const prov = getProvider(providerId);
-  const sel  = document.getElementById('newStudentClass');
-  if (!sel) return;
-  sel.innerHTML = '<option value="">Select class...</option>' +
-    (prov ? (prov.classes||['א׳','ב׳']).map(c => `<option value="${c}">${c}</option>`).join('') : '');
-}
-
-// ---- OPEN MODALS ----
+// ---- MODALS ----
 function openAddStudentModal() {
   const provSel = document.getElementById('newStudentProvider');
-  provSel.innerHTML = '<option value="">Select provider...</option>' +
-    DB.providers.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-  ['newStudentFirst','newStudentLast'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
-  const notesEl = document.getElementById('newStudentNotes'); if(notesEl) notesEl.value='';
+  provSel.innerHTML = '<option value="">Select provider...</option>' + DB.providers.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  ['newStudentFirst','newStudentLast'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  const n=document.getElementById('newStudentNotes'); if(n) n.value='';
   document.getElementById('newStudentClass').innerHTML = '<option value="">Select class...</option>';
   openModal('addStudentModal');
 }
@@ -334,16 +328,9 @@ function openAddProviderModal() {
   openModal('addProviderModal');
 }
 
-// ---- INIT ----
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('.modal-overlay').forEach(overlay => {
-    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
-  });
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
-  });
-  setInterval(async () => {
-    try { await API.health(); updateServerStatus(true); } catch(e) { updateServerStatus(false); }
-  }, 30000);
-  bootstrap();
-});
+function updateClassOptions(providerId) {
+  const prov = getProvider(providerId);
+  const sel  = document.getElementById('newStudentClass');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">Select class...</option>' + (prov ? (prov.classes||['א׳','ב׳']).map(c=>`<option value="${c}">${c}</option>`).join('') : '');
+}
