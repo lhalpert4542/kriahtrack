@@ -39,7 +39,7 @@ function renderDashboard() {
         </div>
         <div class="kpi-value">${totalStudents}</div>
         <div class="kpi-label">תלמידים פעילים</div>
-        <div class="kpi-trend up">↑ שנה"ל ${CURRENT_HEBREW_YEAR}</div>
+        <div class="kpi-trend up">↑ שנה"ל תשפ״ו</div>
       </div>
       <div class="kpi-card gold" onclick="navigate('providers')" style="cursor:pointer">
         <div class="kpi-icon" style="background:var(--gold-100);color:var(--gold-600)">
@@ -90,7 +90,7 @@ function renderDashboard() {
       <div class="card">
         <div class="card-header">
           <span class="card-title">מגמות לפי קטגוריה — שנה"ל</span>
-          <span class="heb-month-pill">${CURRENT_HEBREW_YEAR}</span>
+          <span class="heb-month-pill he">${CURRENT_HEBREW_YEAR}</span>
         </div>
         <div class="card-body"><div class="chart-container"><canvas id="categoryTrendChart"></canvas></div></div>
       </div>
@@ -257,7 +257,7 @@ function renderStudents() {
                 <td><span class="badge badge-teal">${s.class}</span></td>
                 <td>${trendBadge(trend)}</td>
                 <td><span class="badge badge-neutral font-en">${assessments.length}</span></td>
-                <td>${lastA ? `<span class="heb-month-pill" style="font-size:0.72rem;padding:3px 8px">${getMonthLabel(lastA.month)}</span>` : '<span class="text-muted">—</span>'}</td>
+                <td>${lastA ? `<span class="heb-month-pill he" style="font-size:0.72rem;padding:3px 8px">${getMonthLabel(lastA.month)}</span>` : '<span class="text-muted">—</span>'}</td>
                 <td onclick="event.stopPropagation()">
                   <div style="display:flex;gap:6px">
                     <button class="btn btn-outline btn-sm" onclick="navigate('student_profile',{studentId:'${s.id}'})">פרופיל</button>
@@ -434,7 +434,7 @@ function renderProfileOverview(studentId, student, assessments, ytd, lastA, prov
             ${assessments.length === 0 ? `<tr><td colspan="${2+CATEGORIES.length*2}" class="text-center text-muted" style="padding:24px">אין הערכות</td></tr>` :
             assessments.map(a => `
               <tr>
-                <td><span class="heb-month-pill" style="font-size:0.75rem;padding:3px 10px">${getMonthLabel(a.month)}</span></td>
+                <td><span class="heb-month-pill he" style="font-size:0.75rem;padding:3px 10px">${getMonthLabel(a.month)}</span></td>
                 ${CATEGORIES.map(cat => `
                   <td style="text-align:center;font-family:var(--font-en);font-weight:700;color:var(--success)">${a.categories[cat.id]?.correct||0}</td>
                   <td style="text-align:center;font-family:var(--font-en);font-weight:700;color:var(--danger);border-right:2px solid var(--parchment-border)">${a.categories[cat.id]?.mistakes||0}</td>`).join('')}
@@ -458,7 +458,7 @@ function renderProfileAssessments(studentId, assessments) {
       <div class="card mb-4">
         <div class="card-header">
           <span class="card-title">
-            <span class="heb-month-pill">${getMonthLabel(a.month)} ${a.year}</span>
+            <span class="heb-month-pill he">${getMonthLabel(a.month)} ${a.year}</span>
             <span class="badge ${a.source==='ocr'?'badge-info':'badge-neutral'}" style="margin-right:8px">${a.source==='ocr'?'OCR':'ידני'}</span>
           </span>
           <div style="display:flex;gap:8px;align-items:center">
@@ -759,7 +759,7 @@ function renderProviderProfile(providerId) {
                 <td><span class="badge badge-teal">${s.class}</span></td>
                 <td>${trendBadge(trend)}</td>
                 <td><span class="badge badge-neutral font-en">${ass.length}</span></td>
-                <td>${lastA?`<span class="heb-month-pill" style="font-size:0.72rem;padding:3px 8px">${getMonthLabel(lastA.month)}</span>`:'—'}</td>
+                <td>${lastA?`<span class="heb-month-pill he" style="font-size:0.72rem;padding:3px 8px">${getMonthLabel(lastA.month)}</span>`:'—'}</td>
                 <td onclick="event.stopPropagation()"><button class="btn btn-outline btn-sm" onclick="navigate('student_profile',{studentId:'${s.id}'})">פרופיל</button></td>
               </tr>`;
             }).join('')}
@@ -1080,7 +1080,7 @@ function renderOCRStep2() {
     <div class="card">
       <div class="card-header">
         <span class="card-title">שלב 2 — העלאת גיליון</span>
-        <span class="heb-month-pill">${prov?.name} | ${getMonthLabel(ocrSelectedMonth)}</span>
+        <span class="heb-month-pill he">${prov?.name} | ${getMonthLabel(ocrSelectedMonth)}</span>
       </div>
       <div class="card-body">
         <div class="upload-zone" id="uploadZone"
@@ -1263,7 +1263,7 @@ function renderOCRStep4Review() {
     <div class="card">
       <div class="card-header">
         <span class="card-title">שלב 4 — סקירה ואישור</span>
-        <span class="heb-month-pill">${prov?.name} | ${getMonthLabel(ocrSelectedMonth)}</span>
+        <span class="heb-month-pill he">${prov?.name} | ${getMonthLabel(ocrSelectedMonth)}</span>
       </div>
       <div class="card-body">
 
@@ -1657,7 +1657,7 @@ function renderAdminOCR() {
               <tr>
                 <td style="font-family:var(--font-en);font-size:0.82rem">${formatDateTime(imp.timestamp)}</td>
                 <td>${getProvider(imp.provider)?.name||'—'}</td>
-                <td><span class="heb-month-pill" style="font-size:0.72rem;padding:3px 8px">${getMonthLabel(imp.month)}</span></td>
+                <td><span class="heb-month-pill he" style="font-size:0.72rem;padding:3px 8px">${getMonthLabel(imp.month)}</span></td>
                 <td><span class="badge badge-success font-en">${imp.imported}</span></td>
                 <td><span class="badge badge-warning font-en">${imp.overwritten}</span></td>
                 <td><span class="badge badge-neutral font-en">${imp.skipped}</span></td>

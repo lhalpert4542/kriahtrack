@@ -406,3 +406,9 @@ function deleteAssessment(assessmentId, studentId) {
   showToast('הערכה נמחקה', 'warning');
   navigate('student_profile', { studentId });
 }
+// ---- HEBREW DATE DISPLAY ----
+function hebrewYear() { return CURRENT_HEBREW_YEAR; }
+function hebrewMonthLabel(monthId) { return getMonthLabel(monthId); }
+function formatHebrewMonthYear(monthId, year) {
+  return getMonthLabel(monthId) + ' ' + (year || CURRENT_HEBREW_YEAR);
+}

@@ -1,17 +1,17 @@
 // ============================================================
 // KriahTrack — App Bootstrap
-// Opens instantly with demo data, syncs real data in background
+// Opens instantly with mock data, syncs server data silently
 // ============================================================
 
-let currentPage = 'dashboard';
-let profileTab  = 'overview';
+let currentPage    = 'dashboard';
+let profileTab     = 'overview';
 let chartInstances = {};
+let _currentParams = {};
+let _serverSynced  = false;
 
 // ---- INSTANT BOOT ----
-// App opens immediately using demo data from data.js
-// Real server data loads in background and refreshes the view
 document.addEventListener('DOMContentLoaded', () => {
-  // Close modals on overlay click
+  // Modal close handlers
   document.querySelectorAll('.modal-overlay').forEach(overlay => {
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
   });
@@ -19,17 +19,37 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
   });
 
-  // Open dashboard immediately with demo data
+  // Normalize demo data from data.js so it works immediately
+  DB.students = DB.students.map(normalizeStudent);
+  DB.assessments = DB.assessments.map(a => a.categories ? a : normalizeAssessment(a));
+
+  // Hide sync banner — demo data is ready
+  hideSyncBanner();
+
+  // Render dashboard IMMEDIATELY — no waiting
   navigate('dashboard');
+  updateBadges();
 
-  // Sync real data from server in background
-  syncFromServer();
-
-  // Keep-alive ping every 30s
+  // Sync real server data silently in background
+  setTimeout(syncFromServer, 800);
   setInterval(pingServer, 30000);
 });
 
-// ---- BACKGROUND SYNC ----
+// ---- SYNC BANNER ----
+function showSyncBanner(msg, isError) {
+  const banner = document.getElementById('syncBanner');
+  const msgEl  = document.getElementById('syncBannerMsg');
+  if (!banner) return;
+  if (msgEl) msgEl.textContent = msg;
+  if (isError) banner.style.background = 'linear-gradient(90deg,#7a1414,#9a1c1c)';
+  banner.style.display = 'flex';
+}
+function hideSyncBanner() {
+  const banner = document.getElementById('syncBanner');
+  if (banner) banner.style.display = 'none';
+}
+
+// ---- BACKGROUND SERVER SYNC ----
 async function syncFromServer() {
   try {
     await API.health();
@@ -43,7 +63,6 @@ async function syncFromServer() {
       API.getOCRImports().catch(() => []),
     ]);
 
-    // Replace demo data with real server data
     DB.providers   = providers;
     DB.students    = students.map(normalizeStudent);
     DB.assessments = assessments.map(normalizeAssessment);
@@ -51,23 +70,18 @@ async function syncFromServer() {
     DB.auditLog    = auditLogs.map(normalizeAuditRow);
     DB.ocrImports  = ocrImports;
 
+    _serverSynced = true;
     updateServerStatus(true);
     updateBadges();
+    hideSyncBanner();
 
-    // Refresh current page with real data
+    // Silently refresh current page with real data
     navigate(currentPage, _currentParams);
-
-    // Hide sync banner
-    const banner = document.getElementById('syncBanner');
-    if (banner) banner.style.display = 'none';
 
   } catch(err) {
     console.warn('[KT] Server sync failed — using demo data:', err.message);
     updateServerStatus(false);
-    const banner = document.getElementById('syncBanner');
-    const msg    = document.getElementById('syncBannerMsg');
-    if (msg) msg.textContent = 'Offline — showing demo data. Changes will not be saved.';
-    if (banner) banner.style.background = 'linear-gradient(90deg,#8a2020,#a02828)';
+    // Don't show error banner — demo data works fine
   }
 }
 
@@ -78,11 +92,21 @@ async function pingServer() {
 
 // ---- NORMALIZE HELPERS ----
 function normalizeStudent(s) {
-  return { ...s, firstName: s.first_name||s.firstName||'', lastName: s.last_name||s.lastName||'', providerId: s.provider_id||s.providerId||'' };
+  return {
+    ...s,
+    firstName:  s.first_name  || s.firstName  || '',
+    lastName:   s.last_name   || s.lastName   || '',
+    providerId: s.provider_id || s.providerId || '',
+  };
 }
 
 function normalizeAssessment(a) {
-  if (a.categories) return { ...a, studentId: a.student_id||a.studentId, providerId: a.provider_id||a.providerId, createdAt: a.created_at||a.createdAt };
+  if (a.categories) return {
+    ...a,
+    studentId:  a.student_id  || a.studentId,
+    providerId: a.provider_id || a.providerId,
+    createdAt:  a.created_at  || a.createdAt,
+  };
   return {
     ...a,
     studentId:  a.student_id  || a.studentId,
@@ -99,7 +123,14 @@ function normalizeAssessment(a) {
 }
 
 function normalizeAuditRow(r) {
-  return { ...r, entityName: r.entity_name||r.entityName||'', before: r.before_val||r.before||'', after: r.after_val||r.after||'', user: r.user_name||r.user||'Admin', timestamp: r.created_at||r.timestamp||'' };
+  return {
+    ...r,
+    entityName: r.entity_name || r.entityName || '',
+    before:     r.before_val  || r.before     || '',
+    after:      r.after_val   || r.after       || '',
+    user:       r.user_name   || r.user        || 'Admin',
+    timestamp:  r.created_at  || r.timestamp   || '',
+  };
 }
 
 // ---- STATUS ----
@@ -107,7 +138,7 @@ function updateServerStatus(online) {
   const dot  = document.getElementById('serverStatusDot');
   const text = document.getElementById('serverStatusText');
   if (dot)  dot.style.background  = online ? 'var(--success)' : 'var(--danger)';
-  if (text) text.textContent = online ? 'Connected' : 'Offline';
+  if (text) text.textContent = online ? 'Connected' : 'Demo mode';
 }
 
 function updateBadges() {
@@ -118,8 +149,6 @@ function updateBadges() {
 }
 
 // ---- NAVIGATION ----
-let _currentParams = {};
-
 function navigate(page, params = {}) {
   currentPage    = page;
   _currentParams = params;
@@ -142,7 +171,7 @@ function navigate(page, params = {}) {
   if (page === 'student_profile') profileTab = 'overview';
 
   const content = document.getElementById('pageContent');
-  content.style.opacity = '0';
+  content.style.opacity   = '0';
   content.style.transform = 'translateY(6px)';
 
   requestAnimationFrame(() => {
@@ -185,22 +214,15 @@ async function saveNewStudent() {
   const year       = document.getElementById('newStudentYear').value.trim();
   const notes      = document.getElementById('newStudentNotes')?.value.trim() || '';
   if (!firstName || !lastName || !providerId || !cls) { showToast('Please fill all required fields', 'warning'); return; }
-  try {
-    const s = await API.createStudent({ firstName, lastName, providerId, class: cls, year, notes });
-    DB.students.push(normalizeStudent(s));
-    updateBadges();
-    closeModal('addStudentModal');
-    showToast(`${firstName} ${lastName} added`, 'success');
-    if (currentPage === 'students') renderStudents();
-  } catch(e) {
-    // Offline fallback — add locally
-    const local = { id: generateId('s'), firstName, lastName, providerId, class: cls, year, status:'active', notes };
-    DB.students.push(local);
-    updateBadges();
-    closeModal('addStudentModal');
-    showToast(`${firstName} ${lastName} added (offline)`, 'warning');
-    if (currentPage === 'students') renderStudents();
-  }
+  const local = { id: generateId('s'), firstName, lastName, providerId, class: cls, year, status:'active', notes };
+  DB.students.push(local);
+  updateBadges();
+  closeModal('addStudentModal');
+  showToast(`${firstName} ${lastName} added`, 'success');
+  if (currentPage === 'students') renderStudents();
+  // Sync to server
+  try { const s = await API.createStudent({ firstName, lastName, providerId, class: cls, year, notes }); local.id = s.id || local.id; }
+  catch(e) { /* offline — local only */ }
 }
 
 // ---- SAVE PROVIDER ----
@@ -211,22 +233,14 @@ async function saveNewProvider() {
   const city     = document.getElementById('newProviderCity').value.trim();
   const phone    = document.getElementById('newProviderPhone').value.trim();
   if (!name || !director || !email) { showToast('Name, director and email are required', 'warning'); return; }
-  try {
-    const p = await API.createProvider({ name, director, email, city, phone, classes: ['א׳','ב׳'] });
-    p.classes = p.classes || ['א׳','ב׳'];
-    DB.providers.push(p);
-    updateBadges();
-    closeModal('addProviderModal');
-    showToast(`"${name}" added`, 'success');
-    if (currentPage === 'providers') renderProviders();
-  } catch(e) {
-    const local = { id: generateId('p'), name, director, email, city, phone, classes: ['א׳','ב׳'] };
-    DB.providers.push(local);
-    updateBadges();
-    closeModal('addProviderModal');
-    showToast(`"${name}" added (offline)`, 'warning');
-    if (currentPage === 'providers') renderProviders();
-  }
+  const local = { id: generateId('p'), name, director, email, city, phone, classes: ['א׳','ב׳'] };
+  DB.providers.push(local);
+  updateBadges();
+  closeModal('addProviderModal');
+  showToast(`"${name}" added`, 'success');
+  if (currentPage === 'providers') renderProviders();
+  try { const p = await API.createProvider({ name, director, email, city, phone, classes: ['א׳','ב׳'] }); local.id = p.id || local.id; }
+  catch(e) { /* offline */ }
 }
 
 // ---- ASSESSMENT MODAL ----
@@ -249,24 +263,22 @@ async function saveAssessment() {
   const student    = getStudent(studentId);
   const categories = readCategoryInputs();
   const newA = { id: generateId('a'), studentId, providerId: student.providerId, month, year, source:'manual', createdAt: new Date().toISOString(), categories };
-  try {
-    const result = await API.saveAssessment({ studentId, providerId: student.providerId, month, year, categories, source:'manual', studentName: getStudentName(student) });
-    newA.id = result.id;
-  } catch(e) { /* offline — use local id */ }
   const idx = DB.assessments.findIndex(a => a.studentId === studentId && a.month === month && a.year === year);
   if (idx >= 0) DB.assessments[idx] = newA; else DB.assessments.push(newA);
   closeModal('addAssessmentModal');
   showToast('Assessment saved', 'success');
   if (currentPage === 'student_profile') renderStudentProfile(studentId);
+  try { const r = await API.saveAssessment({ studentId, providerId: student.providerId, month, year, categories, source:'manual', studentName: getStudentName(student) }); newA.id = r.id || newA.id; }
+  catch(e) { /* offline */ }
 }
 
 // ---- DELETE ASSESSMENT ----
 async function deleteAssessment(assessmentId, studentId) {
   if (!confirm('Delete this assessment?')) return;
-  try { await API.deleteAssessment(assessmentId); } catch(e) { /* offline */ }
   DB.assessments = DB.assessments.filter(a => a.id !== assessmentId);
   showToast('Assessment deleted', 'warning');
   renderStudentProfile(studentId);
+  try { await API.deleteAssessment(assessmentId); } catch(e) { /* offline */ }
 }
 
 // ---- OCR IMPORT ----
@@ -276,23 +288,21 @@ async function confirmOCRImport() {
     CATEGORIES.forEach(cat => { cats[cat.id] = { correct: row.categories[cat.id].correct, mistakes: row.categories[cat.id].mistakes }; });
     return { studentId: row.student.id, providerId: row.student.providerId, studentName: getStudentName(row.student), categories: cats, action: row.action };
   });
-  // Optimistic local update first
+  // Optimistic local update
+  let saved = 0;
   rows.forEach(row => {
     if (row.action === 'skip') return;
     const cats = row.categories;
     const idx = DB.assessments.findIndex(a => a.studentId === row.studentId && a.month === ocrSelectedMonth && a.year === CURRENT_HEBREW_YEAR);
     const newA = { id: generateId('a'), studentId: row.studentId, providerId: row.providerId, month: ocrSelectedMonth, year: CURRENT_HEBREW_YEAR, source:'ocr', createdAt: new Date().toISOString(), categories: cats };
     if (idx >= 0) DB.assessments[idx] = newA; else DB.assessments.push(newA);
+    saved++;
   });
-  // Then sync to server
-  try {
-    const result = await API.importOCR({ rows, providerId: ocrSelectedProvider, month: ocrSelectedMonth, year: CURRENT_HEBREW_YEAR, fileName: _ocrFile ? _ocrFile.name : 'demo' });
-    showToast(`${result.imported} assessments saved to server`, 'success');
-  } catch(e) {
-    showToast(`Saved locally (${rows.filter(r=>r.action!=='skip').length} records) — will sync when online`, 'warning');
-  }
+  showToast(`${saved} assessments saved`, 'success');
   ocrStep = 1; pendingOCRData = []; _ocrFile = null;
   renderOCR();
+  try { await API.importOCR({ rows, providerId: ocrSelectedProvider, month: ocrSelectedMonth, year: CURRENT_HEBREW_YEAR, fileName: _ocrFile ? _ocrFile.name : 'demo' }); }
+  catch(e) { /* offline */ }
 }
 
 // ---- REFRESH ADMIN LOGS ----

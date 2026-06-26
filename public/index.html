@@ -95,7 +95,7 @@
         <span id="headerSubBreadcrumb" style="color:var(--text-muted);font-size:0.85rem"></span>
       </div>
       <div class="header-actions">
-        <div class="date-badge" id="hebrewDateBadge">26 Sivan 5786</div>
+        <div class="date-badge he" id="hebrewDateBadge" style="font-family:var(--font-he)">כ״ו סיון תשפ״ו</div>
         <button class="header-btn" onclick="navigate('ocr')" title="Upload Worksheet">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         </button>
@@ -110,7 +110,7 @@
     </header>
 
     <!-- Sync banner — shows while loading real data in background -->
-    <div id="syncBanner" style="background:linear-gradient(90deg,var(--teal-800),var(--teal-700));color:#fff;padding:8px 28px;font-size:0.78rem;display:flex;align-items:center;gap:10px;font-family:var(--font-en)">
+    <div id="syncBanner" style="background:linear-gradient(90deg,var(--teal-800),var(--teal-700));color:#fff;padding:8px 28px;font-size:0.78rem;display:none;align-items:center;gap:10px;font-family:var(--font-en)">
       <div class="spinner" style="width:14px;height:14px;border-width:2px;border-color:rgba(255,255,255,0.3);border-top-color:#fff;flex-shrink:0"></div>
       <span id="syncBannerMsg">Syncing with server...</span>
       <button onclick="document.getElementById('syncBanner').style.display='none'" style="margin-left:auto;background:none;border:none;color:rgba(255,255,255,0.6);cursor:pointer;font-size:1rem;line-height:1">✕</button>
