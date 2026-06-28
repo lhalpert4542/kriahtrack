@@ -1881,3 +1881,286 @@ renderProfileOverview = function(sid, s, ass, lastA, prov) {
   `;
   document.head.appendChild(style);
 })();
+
+// ============================================================
+// SMTP EMAIL SYSTEM + UI CLEANUP
+// ============================================================
+
+let _smtpConfigured = false;
+let _smtpChecked = false;
+
+// Check SMTP config on load
+async function checkSMTPConfig() {
+  try {
+    const config = await API.getEmailConfig();
+    _smtpConfigured = config.configured;
+    _smtpChecked = true;
+    // Update server status
+    const dot = $('serverStatusDot'), txt = $('serverStatusText');
+    if (dot) dot.style.background = '#1a6038';
+    if (txt) txt.textContent = _smtpConfigured ? 'Connected · Email ✓' : 'Connected';
+    return config;
+  } catch(e) {
+    _smtpChecked = true;
+    return { configured: false };
+  }
+}
+
+// ── REAL EMAIL SEND via SMTP ─────────────────────────────────
+async function sendEmailSMTP(to, subject, htmlBody, textBody) {
+  try {
+    const result = await API.sendEmail({
+      to: Array.isArray(to) ? to : [to],
+      subject,
+      html: htmlBody,
+      text: textBody || htmlBody.replace(/<[^>]+>/g, ''),
+    });
+    if (result.simulated) {
+      showToast('⚠ SMTP not configured — see Admin → Email Settings', 'warning');
+      return { success: false, simulated: true };
+    }
+    return result;
+  } catch(e) {
+    showToast('Email failed: ' + e.message, 'danger');
+    return { success: false, error: e.message };
+  }
+}
+
+// ── BUILD REPORT HTML FOR EMAIL ──────────────────────────────
+function buildReportEmailHTML(sid, month, year) {
+  const s = getStudent(sid);
+  if (!s) return '';
+  const allAss = getStudentAssessments(sid);
+  const currentA = allAss.find(a => a.month === month && a.year === year);
+  if (!currentA) return '';
+  const monthLabel = getMonthLabel(month);
+  const monthOrder = getMonthOrder(month);
+  const ytdAss = allAss.filter(a => getMonthOrder(a.month) <= monthOrder && a.year === year);
+  const note = getReportNote(sid, month, year);
+  const lang = getReportLang(sid, month, year);
+  const directorName = KRIAH_DIRECTOR.name || '';
+  const cls = getClass(s.classId);
+  const div = getClassDivision(s.classId);
+
+  return `<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  body{font-family:'Segoe UI',Arial,sans-serif;direction:rtl;background:#f5f5f5;margin:0;padding:20px}
+  .container{max-width:600px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.1)}
+  .header{background:linear-gradient(135deg,#005778,#1a7a9a);padding:24px;text-align:center;color:#fff}
+  .header h1{margin:0;font-size:1.8rem;font-weight:900}
+  .header p{margin:8px 0 0;opacity:0.8;font-size:0.9rem}
+  .gold-line{height:3px;background:linear-gradient(90deg,transparent,#D9A44E,transparent)}
+  .body{padding:24px}
+  .student-name{font-size:1.3rem;font-weight:900;color:#005778;text-align:center;margin-bottom:4px}
+  .month-label{text-align:center;color:#808285;font-size:0.9rem;margin-bottom:20px}
+  .scores{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:20px}
+  .score-box{background:#005778;border-radius:8px;padding:12px 6px;text-align:center;color:#fff}
+  .score-box .cat{font-size:0.6rem;font-weight:700;opacity:0.8;margin-bottom:6px}
+  .score-box .num{font-size:1.6rem;font-weight:900}
+  .score-box .err{font-size:0.6rem;opacity:0.7;margin-top:3px}
+  table{width:100%;border-collapse:collapse;font-size:0.85rem;margin-bottom:20px}
+  th{background:#005778;color:#fff;padding:8px 10px;text-align:right}
+  td{padding:7px 10px;border-bottom:1px solid #e8d9b8;text-align:right}
+  tr:nth-child(even){background:#f8f9fa}
+  .note{background:#fdf8f0;border:1px solid #e8d9b8;border-radius:8px;padding:14px;margin-bottom:20px;font-size:0.88rem;line-height:1.7;color:#333}
+  .footer{background:#f0f0f0;padding:16px 24px;text-align:center;font-size:0.78rem;color:#808285;border-top:1px solid #e8d9b8}
+  .divider{height:1px;background:linear-gradient(90deg,transparent,#D9A44E,transparent);margin:16px 0}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>קריאה קארטל</h1>
+    <p>Ichud Boys Program — Kriah Progress Report</p>
+  </div>
+  <div class="gold-line"></div>
+  <div class="body">
+    <div class="student-name">${sName(s)}</div>
+    <div class="month-label">${monthLabel} ${year} · ${cls ? cls.name : ''} ${div ? '· ' + div.name : ''}</div>
+    <div class="scores">
+      ${CATS.map(cat => {
+        const c = currentA.categories[cat.id]?.correct || 0;
+        const m = currentA.categories[cat.id]?.mistakes || 0;
+        return `<div class="score-box">
+          <div class="cat">${cat.label}</div>
+          <div class="num">${c}</div>
+          ${cat.hasMistakes ? `<div class="err">${m} err.</div>` : '<div class="err">&nbsp;</div>'}
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="divider"></div>
+    <table>
+      <thead><tr><th>חודש</th>${CATS.map(c => `<th>${c.label}</th>`).join('')}</tr></thead>
+      <tbody>
+        ${ytdAss.map(a => `<tr style="${a.month===month?'background:#e0eef5;font-weight:700':''}">
+          <td>${getMonthLabel(a.month)}</td>
+          ${CATS.map(cat => `<td style="text-align:center;font-weight:700;color:#005778">${a.categories[cat.id]?.correct||0}</td>`).join('')}
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    ${note ? `<div class="note">${note}</div>` : ''}
+    ${directorName ? `<div style="font-size:0.82rem;color:#808285;text-align:center">Director: <strong>${directorName}</strong></div>` : ''}
+  </div>
+  <div class="footer">
+    KriahTrack · Ichud Boys Program · ${new Date().getFullYear()}
+  </div>
+</div>
+</body></html>`;
+}
+
+// ── SEND COMBINED EMAIL (real SMTP) ──────────────────────────
+sendCombinedEmail = async function(sid, month, year, isResend = false) {
+  const s = getStudent(sid);
+  if (!s) return;
+  const emails = (s.emails || []).filter(e => e && e.includes('@'));
+  if (!emails.length) {
+    showToast('No parent emails on file', 'warning');
+    openEditStudentEmailModal(sid);
+    return;
+  }
+  const monthLabel = getMonthLabel(month);
+  const note = getReportNote(sid, month, year);
+  const video = getStudentVideo(sid, month, year);
+  const subject = `Kriah Report — ${sName(s)} — ${monthLabel} ${year}`;
+  const htmlBody = buildReportEmailHTML(sid, month, year);
+
+  showToast('Sending email...', 'info');
+  const result = await sendEmailSMTP(emails, subject, htmlBody);
+
+  if (result.success) {
+    logEmail(sid, month, year, video ? 'combined' : 'report', emails, subject);
+    showToast(`✓ Email sent to ${emails.join(', ')}`, 'success');
+    if (video) showToast('Note: Video must be sent separately (email attachment limit)', 'info');
+  } else if (result.simulated) {
+    // Fallback to mailto
+    const body = `Dear Parent,\n\nPlease find the Kriah progress report for ${sName(s)} for ${monthLabel} ${year}.\n\n${note ? 'Note: ' + note + '\n\n' : ''}Best regards,\nIchud Boys Program`;
+    window.open(`mailto:${emails.join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
+    logEmail(sid, month, year, 'report', emails, subject);
+    showToast('Email client opened (SMTP not configured)', 'warning');
+  }
+};
+
+// ── BULK SEND REPORTS ────────────────────────────────────────
+async function sendBulkReports() {
+  const classFilter = _rp;
+  const month = _rm;
+  const ss = classFilter ? getClassStudents(classFilter) : STUDENTS;
+  const wd = ss.filter(s => ASSESSMENTS.some(a => a.studentId === s.id && a.month === month));
+  const withEmail = wd.filter(s => (s.emails||[]).some(e => e && e.includes('@')));
+  const noEmail = wd.filter(s => !(s.emails||[]).some(e => e && e.includes('@')));
+
+  if (!withEmail.length) {
+    showToast('No students with valid parent emails', 'warning');
+    return;
+  }
+
+  const confirmed = confirm(`Send reports to ${withEmail.length} students?\n${noEmail.length > 0 ? `⚠ ${noEmail.length} students have no email and will be skipped.` : ''}`);
+  if (!confirmed) return;
+
+  showToast(`Sending ${withEmail.length} emails...`, 'info');
+  let sent = 0, failed = 0;
+  for (const s of withEmail) {
+    const result = await sendCombinedEmail(s.id, month, year, false);
+    sent++;
+    await new Promise(r => setTimeout(r, 300)); // Rate limit
+  }
+  showToast(`✓ ${sent} reports sent${noEmail.length > 0 ? ` · ${noEmail.length} skipped (no email)` : ''}`, 'success');
+}
+
+// ── EMAIL SETTINGS IN ADMIN ──────────────────────────────────
+async function renderEmailSettings() {
+  const config = await checkSMTPConfig();
+  const el = $('aC');
+  if (!el) return;
+  el.innerHTML = `
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">📧 Email Settings (SMTP)</span>
+    <span class="badge ${config.configured ? 'badge-success' : 'badge-warning'}">${config.configured ? '✓ Connected' : '⚠ Not configured'}</span>
+  </div>
+  <div class="card-body">
+    ${config.configured
+      ? `<div class="alert alert-success">✓ SMTP is configured and ready. Emails will be sent from <strong>${config.user}</strong> via <strong>${config.host}:${config.port}</strong></div>`
+      : `<div class="alert alert-warning">⚠ SMTP is not configured. Emails will open your mail client instead of sending automatically.</div>`}
+
+    <div style="background:#f8f9fa;border:1px solid #e8d9b8;border-radius:10px;padding:20px;margin-top:16px">
+      <h4 style="color:#005778;margin-bottom:14px">How to configure SMTP</h4>
+      <p style="font-size:0.85rem;color:#444;margin-bottom:12px">Add these environment variables in your <strong>Render Dashboard → Settings → Environment Variables</strong>:</p>
+      <table style="width:100%;font-size:0.84rem;border-collapse:collapse">
+        <thead><tr><th style="background:#005778;color:#fff;padding:8px 12px;text-align:left">Variable</th><th style="background:#005778;color:#fff;padding:8px 12px;text-align:left">Value</th><th style="background:#005778;color:#fff;padding:8px 12px;text-align:left">Example</th></tr></thead>
+        <tbody>
+          ${[
+            ['SMTP_HOST','Your email provider SMTP host','smtp.gmail.com'],
+            ['SMTP_PORT','SMTP port (587 for TLS, 465 for SSL)','587'],
+            ['SMTP_USER','Your email address','kriahtrack@gmail.com'],
+            ['SMTP_PASS','App password (not your login password)','xxxx xxxx xxxx xxxx'],
+            ['SMTP_FROM_NAME','Display name for sent emails','Ichud Boys Program — Kriah'],
+          ].map(([v,d,e]) => `<tr style="border-bottom:1px solid #e8d9b8"><td style="padding:8px 12px;font-family:monospace;font-weight:700;color:#005778">${v}</td><td style="padding:8px 12px;color:#444;font-size:0.8rem">${d}</td><td style="padding:8px 12px;color:#808285;font-size:0.78rem">${e}</td></tr>`).join('')}
+        </tbody>
+      </table>
+
+      <div style="margin-top:16px;background:#e0eef5;border-radius:8px;padding:14px">
+        <div style="font-weight:700;color:#005778;margin-bottom:8px">📌 Gmail Setup (recommended)</div>
+        <ol style="font-size:0.84rem;color:#444;margin:0;padding-right:20px;line-height:1.8">
+          <li>Go to <strong>myaccount.google.com → Security → 2-Step Verification</strong> (enable it)</li>
+          <li>Go to <strong>App passwords</strong> → Select "Mail" → Generate</li>
+          <li>Copy the 16-character password → paste as <code>SMTP_PASS</code></li>
+          <li>Set <code>SMTP_HOST=smtp.gmail.com</code> and <code>SMTP_PORT=587</code></li>
+        </ol>
+      </div>
+
+      <div style="margin-top:14px;display:flex;gap:10px">
+        <button class="btn btn-primary btn-sm" onclick="testSMTPConnection()">🔌 Test Connection</button>
+        <button class="btn btn-outline btn-sm" onclick="window.open('https://dashboard.render.com','_blank')">Open Render Dashboard</button>
+      </div>
+    </div>
+  </div>
+</div>`;
+}
+
+async function testSMTPConnection() {
+  showToast('Testing SMTP connection...', 'info');
+  try {
+    const result = await API.testEmail();
+    if (result.configured) {
+      showToast('✓ SMTP connection successful!', 'success');
+    } else {
+      showToast('⚠ ' + result.message, 'warning');
+    }
+  } catch(e) {
+    showToast('Connection test failed: ' + e.message, 'danger');
+  }
+}
+
+// ── PATCH ADMIN to add Email Settings tab ────────────────────
+const _origRenderAdmin2 = renderAdmin;
+renderAdmin = function() {
+  $('pageContent').innerHTML = `
+<div class="page-header"><div><h1 class="page-title">Admin Panel</h1><p class="page-subtitle">Logs, audit trail, email settings, performance</p></div></div>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px">
+  <div class="kpi-card"><div class="kpi-value">${SYS_LOGS.length}</div><div class="kpi-label">System Logs</div></div>
+  <div class="kpi-card gold"><div class="kpi-value">${AUDIT_LOG.length}</div><div class="kpi-label">Audit Records</div></div>
+  <div class="kpi-card success"><div class="kpi-value">${EMAIL_LOG.length}</div><div class="kpi-label">Emails Sent</div></div>
+  <div class="kpi-card ${_smtpConfigured?'success':'warning'}"><div class="kpi-value">${_smtpConfigured?'✓':'⚠'}</div><div class="kpi-label">SMTP Status</div></div>
+</div>
+<div style="display:flex;border-bottom:2px solid #e8d9b8;margin-bottom:22px">${['logs','audit','email','perf'].map(tab=>`<button style="padding:9px 18px;font-size:0.84rem;font-weight:${_aTab===tab?'700':'600'};color:${_aTab===tab?'#005778':'#808285'};cursor:pointer;border:none;background:${_aTab===tab?'#e0eef5':'transparent'};border-bottom:2px solid ${_aTab===tab?'#005778':'transparent'};margin-bottom:-2px;border-radius:${_aTab===tab?'8px 8px 0 0':'0'}" onclick="_aTab='${tab}';renderAdmin()">${{logs:'System Logs',audit:'Audit Trail',email:'📧 Email Settings',perf:'Performance'}[tab]}</button>`).join('')}</div>
+<div id="aC"></div>`;
+
+  if (_aTab === 'logs') {
+    $('aC').innerHTML = `<div class="card"><div class="card-header"><span class="card-title">System Logs (${SYS_LOGS.length})</span></div><div class="card-body" style="padding:0 20px">${SYS_LOGS.map(l=>`<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid #e8d9b8;font-size:0.82rem"><div style="width:7px;height:7px;border-radius:50%;margin-top:5px;flex-shrink:0;background:${{success:'#1a6038',warning:'#D9A44E',danger:'#9a1c1c',info:'#005778'}[l.type]||'#808285'}"></div><div style="font-size:0.7rem;color:#808285;white-space:nowrap;min-width:80px">${fmtTime(l.timestamp)}</div><div style="flex:1;color:#444">${l.message}</div></div>`).join('')}</div></div>`;
+  } else if (_aTab === 'audit') {
+    $('aC').innerHTML = `<div class="card"><div class="card-header"><span class="card-title">Audit Trail (${AUDIT_LOG.length})</span></div>${AUDIT_LOG.length===0?'<div class="card-body" style="text-align:center;padding:40px;color:#808285">No audit records yet</div>':`<div class="table-wrapper"><table><thead><tr><th>Time</th><th>Action</th><th>Name</th><th>Before</th><th>After</th></tr></thead><tbody>${AUDIT_LOG.map(e=>`<tr><td style="font-size:0.76rem;white-space:nowrap">${fmtTime(e.timestamp)}</td><td><span class="badge badge-blue">${e.action}</span></td><td class="primary he">${e.entityName}</td><td style="color:#9a1c1c;text-decoration:line-through;font-size:0.8rem">${e.before}</td><td style="color:#1a6038;font-weight:700;font-size:0.8rem">${e.after}</td></tr>`).join('')}</tbody></table></div>`}</div>`;
+  } else if (_aTab === 'email') {
+    renderEmailSettings();
+  } else {
+    $('aC').innerHTML = `<div class="grid-2"><div class="card"><div class="card-header"><span class="card-title">System Health</span></div><div class="card-body">${[['Students',STUDENTS.length],['Classes',CLASSES.length],['Divisions',DIVISIONS.length],['Providers',PROVIDERS.length],['Assessments',ASSESSMENTS.length],['Emails Sent',EMAIL_LOG.length],['OCR Imports',OCR_IMPORTS.length]].map(([l,v])=>`<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #e8d9b8;font-size:0.84rem"><span style="color:#808285">${l}</span><span style="font-weight:800">${v}</span></div>`).join('')}<div style="background:#e4f2eb;border:1px solid #b0d8c0;border-radius:8px;padding:12px;margin-top:14px;font-size:0.84rem;color:#1a6038">✓ All systems operating normally</div></div></div><div class="card"><div class="card-header"><span class="card-title">Email Log (${EMAIL_LOG.length})</span></div><div class="card-body" style="padding:0">${EMAIL_LOG.length===0?'<div style="text-align:center;padding:30px;color:#808285">No emails sent yet</div>':`<table><thead><tr><th>Student</th><th>Month</th><th>Type</th><th>Status</th><th>Action</th></tr></thead><tbody>${EMAIL_LOG.slice(0,10).map(e=>{const s=getStudent(e.studentId);return`<tr><td class="primary he" style="font-size:0.82rem">${s?sName(s):'—'}</td><td><span class="he" style="background:#005778;color:#fff;padding:2px 7px;border-radius:20px;font-size:0.68rem;font-weight:700">${getMonthLabel(e.month)}</span></td><td><span class="badge badge-blue" style="font-size:0.65rem">${e.type}</span></td><td><span class="badge badge-success" style="font-size:0.65rem">✓ Sent</span></td><td><button class="btn btn-ghost btn-sm" style="font-size:0.72rem" onclick="resendEmail('${e.id}')">Resend</button></td></tr>`;}).join('')}</tbody></table>`}</div></div></div>`;
+  }
+};
+
+// ── BOOT — check SMTP on startup ─────────────────────────────
+const _origDOMLoaded = document.addEventListener;
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(checkSMTPConfig, 2000);
+});

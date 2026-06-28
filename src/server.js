@@ -52,3 +52,83 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n🚀 KriahTrack running at http://localhost:${PORT}`);
   console.log(`📁 Data: kriahtrack-server/db/kriahtrack.json\n`);
 });
+
+// ── EMAIL via SMTP (nodemailer) ──────────────────────────────
+const nodemailer = require('nodemailer');
+
+// SMTP config — stored in environment variables
+// Set these in Render dashboard: Settings → Environment Variables
+function getTransporter() {
+  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+  const port = parseInt(process.env.SMTP_PORT || '587');
+  const user = process.env.SMTP_USER || '';
+  const pass = process.env.SMTP_PASS || '';
+  if (!user || !pass) return null;
+  return nodemailer.createTransport({
+    host, port,
+    secure: port === 465,
+    auth: { user, pass },
+    tls: { rejectUnauthorized: false }
+  });
+}
+
+// POST /api/email/send
+app.post('/api/email/send', async (req, res) => {
+  try {
+    const { to, subject, html, text, attachments } = req.body;
+    if (!to || !subject) return res.status(400).json({ error: 'to and subject required' });
+
+    const transporter = getTransporter();
+    if (!transporter) {
+      // Log the attempt even if SMTP not configured
+      db.addSystemLog('warning', `Email attempted (no SMTP configured): ${Array.isArray(to)?to.join(', '):to}`);
+      return res.status(200).json({ 
+        success: false, 
+        simulated: true,
+        message: 'SMTP not configured — email logged but not sent. Add SMTP_USER and SMTP_PASS in Render environment variables.',
+        to, subject
+      });
+    }
+
+    const fromName = process.env.SMTP_FROM_NAME || 'Ichud Boys Program — Kriah';
+    const fromEmail = process.env.SMTP_USER;
+
+    const info = await transporter.sendMail({
+      from: `"${fromName}" <${fromEmail}>`,
+      to: Array.isArray(to) ? to.join(', ') : to,
+      subject,
+      text: text || '',
+      html: html || text || '',
+      attachments: attachments || [],
+    });
+
+    db.addSystemLog('success', `Email sent: ${subject} → ${Array.isArray(to)?to.join(', '):to}`);
+    res.json({ success: true, messageId: info.messageId, to, subject });
+  } catch(e) {
+    db.addSystemLog('danger', `Email failed: ${e.message}`);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/email/test — test SMTP connection
+app.post('/api/email/test', async (req, res) => {
+  const transporter = getTransporter();
+  if (!transporter) return res.json({ configured: false, message: 'SMTP_USER and SMTP_PASS not set in environment variables' });
+  try {
+    await transporter.verify();
+    res.json({ configured: true, message: 'SMTP connection successful', host: process.env.SMTP_HOST, user: process.env.SMTP_USER });
+  } catch(e) {
+    res.json({ configured: false, message: e.message });
+  }
+});
+
+// GET /api/email/config — check if SMTP is configured
+app.get('/api/email/config', (req, res) => {
+  res.json({
+    configured: !!(process.env.SMTP_USER && process.env.SMTP_PASS),
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: process.env.SMTP_PORT || '587',
+    user: process.env.SMTP_USER ? process.env.SMTP_USER.replace(/(.{2}).*(@.*)/, '$1***$2') : null,
+    fromName: process.env.SMTP_FROM_NAME || 'Ichud Boys Program — Kriah',
+  });
+});

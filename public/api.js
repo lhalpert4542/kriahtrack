@@ -32,5 +32,8 @@ const API = (() => {
     addSystemLog:    (t,m)   => post('/logs/system', { type:t, message:m }),
     getSummary:      ()      => get('/analytics/summary'),
     downloadBackup:  ()      => { window.location.href = BASE + '/backup'; },
+    sendEmail:       (data)  => post('/email/send', data),
+    testEmail:       ()      => post('/email/test', {}),
+    getEmailConfig:  ()      => get('/email/config'),
   };
 })();
