@@ -1234,3 +1234,650 @@ document.addEventListener('DOMContentLoaded',()=>{
     }catch(e){console.warn('[KT] Using demo data');}
   },1500);
 });
+
+// ============================================================
+// FEATURE ADDITIONS — All new requirements
+// ============================================================
+
+// ── RICH MOCK DATA with emails, providers, allocations ───────
+(function enrichMockData() {
+  // Add emails to existing students
+  const emailData = [
+    {id:'s1',  emails:['cohen.father@gmail.com','cohen.mother@gmail.com']},
+    {id:'s2',  emails:['levi.dad@gmail.com']},
+    {id:'s3',  emails:['goldberg.parents@gmail.com','goldberg.mom@yahoo.com']},
+    {id:'s4',  emails:['rosenberg.family@gmail.com']},
+    {id:'s5',  emails:['friedman.dad@gmail.com','friedman.mom@gmail.com']},
+    {id:'s6',  emails:['berger.parents@gmail.com']},
+    {id:'s7',  emails:['stein.father@gmail.com','stein.mother@gmail.com']},
+    {id:'s8',  emails:['weiss.dad@gmail.com']},
+    {id:'s9',  emails:['schwartz.parents@gmail.com','schwartz.mom@gmail.com']},
+    {id:'s10', emails:['greenbaum.family@gmail.com']},
+    {id:'s11', emails:['bloom.dad@gmail.com','bloom.mom@gmail.com']},
+    {id:'s12', emails:['horowitz.parents@gmail.com']},
+  ];
+  emailData.forEach(ed => {
+    const s = STUDENTS.find(x => x.id === ed.id);
+    if (s) s.emails = ed.emails;
+  });
+
+  // Ensure providers have proper data
+  PROVIDERS[0].phone = '718-555-0101';
+  PROVIDERS[1].phone = '718-555-0102';
+  PROVIDERS[2].phone = '718-555-0103';
+  PROVIDERS[3].phone = '718-555-0104';
+})();
+
+// ── EMAIL TRACKING SYSTEM ────────────────────────────────────
+let EMAIL_LOG = []; // { id, studentId, month, year, type, emails, sentAt, status, subject }
+
+function logEmail(studentId, month, year, type, emails, subject) {
+  const entry = {
+    id: genId('email'),
+    studentId, month, year, type, // 'report' | 'video' | 'combined'
+    emails: Array.isArray(emails) ? emails : [emails],
+    sentAt: new Date().toISOString(),
+    status: 'sent', // 'sent' | 'failed' | 'pending'
+    subject,
+  };
+  EMAIL_LOG.unshift(entry);
+  SYS_LOGS.unshift({ id: genId('l'), type: 'info', message: `Email sent: ${type} — ${getStudent(studentId) ? sName(getStudent(studentId)) : studentId} — ${getMonthLabel(month)}`, timestamp: new Date().toISOString() });
+  return entry;
+}
+
+function getStudentEmailLog(studentId) {
+  return EMAIL_LOG.filter(e => e.studentId === studentId);
+}
+
+function resendEmail(emailId) {
+  const entry = EMAIL_LOG.find(e => e.id === emailId);
+  if (!entry) return;
+  const s = getStudent(entry.studentId);
+  if (!s) return;
+  sendCombinedEmail(entry.studentId, entry.month, entry.year, true);
+}
+
+// ── COMBINED EMAIL (report + video in 1 email) ───────────────
+function sendCombinedEmail(sid, month, year, isResend = false) {
+  const s = getStudent(sid);
+  if (!s) return;
+  const emails = (s.emails || []).filter(e => e);
+  if (!emails.length) {
+    showToast('No parent emails on file — please add emails first', 'warning');
+    openEditStudentEmailModal(sid);
+    return;
+  }
+  const monthLabel = getMonthLabel(month);
+  const video = getStudentVideo(sid, month, year);
+  const hasVideo = !!video;
+  const isFinal = isReportFinal(sid, month, year);
+  const note = getReportNote(sid, month, year);
+
+  // Build email body
+  const subject = `Kriah ${hasVideo ? 'Report & Video' : 'Report'} — ${sName(s)} — ${monthLabel} ${year}`;
+  const body = `Dear Parent,
+
+Please find the Kriah progress ${hasVideo ? 'report and reading video' : 'report'} for ${sName(s)} for ${monthLabel} ${year}.
+
+${note ? `Teacher's Note:\n${note}\n` : ''}
+${isFinal ? '✓ This report has been finalized by the Kriah Director.' : ''}
+
+${hasVideo ? `📹 Reading Video: A video of ${sName(s)}'s reading session is attached.\n` : ''}
+Best regards,
+Ichud Boys Program — Kriah Department
+${KRIAH_DIRECTOR.name ? `Kriah Director: ${KRIAH_DIRECTOR.name}` : ''}`;
+
+  const mailto = `mailto:${emails.join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.open(mailto, '_blank');
+
+  // Log the email
+  logEmail(sid, month, year, hasVideo ? 'combined' : 'report', emails, subject);
+  showToast(`Email opened for ${emails.length} address${emails.length > 1 ? 'es' : ''}${isResend ? ' (resend)' : ''}`, 'success');
+}
+
+// ── EDIT STUDENT EMAILS MODAL ────────────────────────────────
+function openEditStudentEmailModal(sid) {
+  const s = getStudent(sid);
+  if (!s) return;
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,61,86,0.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px;box-shadow:0 24px 56px rgba(0,87,120,0.18);width:100%;max-width:480px">
+      <div style="background:linear-gradient(135deg,#003d56,#005778);padding:18px 24px;border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:1rem;font-weight:800;color:#fff">Parent Emails — <span class="he">${sName(s)}</span></span>
+        <button onclick="this.closest('[style*=fixed]').remove()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;color:#fff;cursor:pointer;font-size:0.9rem">✕</button>
+      </div>
+      <div style="padding:24px">
+        <div class="form-group">
+          <label class="form-label">Parent Email 1</label>
+          <input type="email" class="form-control" id="em_email1" value="${(s.emails||[])[0]||''}" placeholder="parent@email.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Parent Email 2</label>
+          <input type="email" class="form-control" id="em_email2" value="${(s.emails||[])[1]||''}" placeholder="parent2@email.com">
+        </div>
+        <div style="background:#e0eef5;border-radius:8px;padding:12px;font-size:0.82rem;color:#005778">
+          ℹ Reports and videos will be sent to both email addresses
+        </div>
+      </div>
+      <div style="padding:14px 24px;border-top:1px solid #e8d9b8;display:flex;gap:10px;background:#fdf8f0;border-radius:0 0 16px 16px">
+        <button class="btn btn-primary" onclick="saveStudentEmails('${sid}',this.closest('[style*=fixed]'))">Save Emails</button>
+        <button class="btn btn-ghost" onclick="this.closest('[style*=fixed]').remove()">Cancel</button>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+function saveStudentEmails(sid, overlay) {
+  const s = getStudent(sid);
+  if (!s) return;
+  const e1 = document.getElementById('em_email1')?.value.trim();
+  const e2 = document.getElementById('em_email2')?.value.trim();
+  s.emails = [];
+  if (e1) s.emails.push(e1);
+  if (e2) s.emails.push(e2);
+  overlay?.remove();
+  showToast('Emails saved', 'success');
+  if (_page === 'student_profile') renderStudentProfile(sid);
+}
+
+// ── PROGRAMS & CLASSES ANALYTICS ────────────────────────────
+function renderProgramsAnalytics() {
+  $('pageContent').innerHTML = `
+<div class="page-header">
+  <div><h1 class="page-title">Programs & Classes Analytics</h1><p class="page-subtitle">Ahuvim · Nechmudim · Masmidim — Side-by-side comparison</p></div>
+  <button class="btn btn-ghost btn-sm" onclick="navigate('analytics')">← Full Analytics</button>
+</div>
+
+<!-- DIVISION COMPARISON CARDS -->
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:24px">
+  ${DIVISIONS.map(div => {
+    const ss = getDivisionStudents(div.id);
+    const cls = getDivisionClasses(div.id);
+    const ass = ASSESSMENTS.filter(a => ss.some(s => s.id === a.studentId));
+    const imp = ss.filter(s => getStudentTrend(s.id) === 'up').length;
+    const str = ss.filter(s => getStudentTrend(s.id) === 'down').length;
+    const flat = ss.length - imp - str;
+    const catAvgs = CATS.map(cat => {
+      const v = ass.length ? Math.round(ass.reduce((s,a) => s+(a.categories[cat.id]?.correct||0),0)/ass.length*10)/10 : 0;
+      return { cat, v };
+    });
+    return `
+    <div class="card" style="border-top:4px solid ${div.color}">
+      <div class="card-header" style="background:linear-gradient(135deg,${div.color},${div.color}cc)">
+        <span class="card-title" style="color:#fff;font-size:1.05rem">${div.name}</span>
+        <span style="color:rgba(255,255,255,0.7);font-size:0.8rem">${cls.length} classes · ${ss.length} students</span>
+      </div>
+      <div class="card-body">
+        <!-- Trend pills -->
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <div style="flex:1;text-align:center;background:#e4f2eb;border-radius:8px;padding:8px"><div style="font-size:1.4rem;font-weight:900;color:#1a6038">${imp}</div><div style="font-size:0.68rem;color:#1a6038;font-weight:700">↑ Improving</div></div>
+          <div style="flex:1;text-align:center;background:#f5f5f5;border-radius:8px;padding:8px"><div style="font-size:1.4rem;font-weight:900;color:#808285">${flat}</div><div style="font-size:0.68rem;color:#808285;font-weight:700">→ Stable</div></div>
+          <div style="flex:1;text-align:center;background:#fdecea;border-radius:8px;padding:8px"><div style="font-size:1.4rem;font-weight:900;color:#9a1c1c">${str}</div><div style="font-size:0.68rem;color:#9a1c1c;font-weight:700">↓ At Risk</div></div>
+        </div>
+        <!-- Category averages -->
+        ${catAvgs.map(({cat,v}) => `
+          <div style="margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+              <span class="he" style="font-size:0.78rem;font-weight:700;color:${cat.color}">${cat.label}</span>
+              <span style="font-size:0.78rem;font-weight:800;color:#005778">${v}</span>
+            </div>
+            <div style="background:#f0ece4;border-radius:20px;height:5px;overflow:hidden">
+              <div style="height:100%;border-radius:20px;background:${cat.color};width:${Math.min(100,v*4)}%;transition:width 0.6s"></div>
+            </div>
+          </div>`).join('')}
+        <div style="border-top:1px solid #e8d9b8;margin-top:10px;padding-top:10px;font-size:0.78rem;color:#808285">
+          ${ass.length} total assessments
+        </div>
+      </div>
+    </div>`;
+  }).join('')}
+</div>
+
+<!-- FASTEST IMPROVING CLASSES -->
+<div class="grid-2 mb-6">
+  <div class="card">
+    <div class="card-header"><span class="card-title">🚀 Fastest Improving Classes</span></div>
+    <div class="card-body" style="padding:0">
+      <table>
+        <thead><tr><th>Class</th><th>Division</th><th>Improving</th><th>Avg Score</th><th>Trend</th></tr></thead>
+        <tbody>
+          ${CLASSES.map(cls => {
+            const ss = getClassStudents(cls.id);
+            const div = getClassDivision(cls.id);
+            const ass = ASSESSMENTS.filter(a => ss.some(s => s.id === a.studentId));
+            const imp = ss.filter(s => getStudentTrend(s.id) === 'up').length;
+            const avgScore = ass.length ? Math.round(CATS.reduce((sum,cat) => sum + ass.reduce((s,a) => s+(a.categories[cat.id]?.correct||0),0)/ass.length,0)/CATS.length*10)/10 : 0;
+            const impPct = ss.length ? Math.round(imp/ss.length*100) : 0;
+            return { cls, div, ss, imp, avgScore, impPct };
+          }).sort((a,b) => b.impPct - a.impPct).map(({cls,div,ss,imp,avgScore,impPct}) => `
+            <tr class="clickable" onclick="navigate('class_profile',{classId:'${cls.id}'})">
+              <td class="primary">${cls.name}</td>
+              <td><span style="background:#e0eef5;color:#005778;padding:2px 8px;border-radius:20px;font-size:0.72rem;font-weight:700">${div?div.name:'—'}</span></td>
+              <td><span class="badge badge-success">${imp}/${ss.length}</span></td>
+              <td style="font-weight:800;color:#005778">${avgScore}</td>
+              <td><div style="background:#f0ece4;border-radius:20px;height:6px;width:80px;overflow:hidden"><div style="height:100%;border-radius:20px;background:#1a6038;width:${impPct}%"></div></div></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><span class="card-title">⚠ Classes Needing Attention</span></div>
+    <div class="card-body" style="padding:0">
+      <table>
+        <thead><tr><th>Class</th><th>Division</th><th>At Risk</th><th>Avg Score</th><th>Action</th></tr></thead>
+        <tbody>
+          ${CLASSES.map(cls => {
+            const ss = getClassStudents(cls.id);
+            const div = getClassDivision(cls.id);
+            const ass = ASSESSMENTS.filter(a => ss.some(s => s.id === a.studentId));
+            const str = ss.filter(s => getStudentTrend(s.id) === 'down').length;
+            const avgScore = ass.length ? Math.round(CATS.reduce((sum,cat) => sum + ass.reduce((s,a) => s+(a.categories[cat.id]?.correct||0),0)/ass.length,0)/CATS.length*10)/10 : 0;
+            return { cls, div, ss, str, avgScore };
+          }).sort((a,b) => b.str - a.str).map(({cls,div,ss,str,avgScore}) => `
+            <tr class="${str > 0 ? 'danger-row' : ''} clickable" onclick="navigate('class_profile',{classId:'${cls.id}'})">
+              <td class="primary">${cls.name}</td>
+              <td><span style="background:#e0eef5;color:#005778;padding:2px 8px;border-radius:20px;font-size:0.72rem;font-weight:700">${div?div.name:'—'}</span></td>
+              <td><span class="badge ${str>0?'badge-danger':'badge-success'}">${str}/${ss.length}</span></td>
+              <td style="font-weight:800;color:${avgScore<15?'#9a1c1c':'#005778'}">${avgScore}</td>
+              <td onclick="event.stopPropagation()"><button class="btn btn-outline btn-sm" onclick="navigate('class_profile',{classId:'${cls.id}'})">View</button></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- SIDE BY SIDE CHART -->
+<div class="card mb-6">
+  <div class="card-header"><span class="card-title">Category Averages — Division Comparison</span></div>
+  <div class="card-body"><div class="chart-container"><canvas id="divCompChart"></canvas></div></div>
+</div>
+
+<!-- YTD TREND BY DIVISION -->
+<div class="card mb-6">
+  <div class="card-header"><span class="card-title">YTD Progress — All Divisions</span></div>
+  <div class="card-body"><div class="chart-container"><canvas id="ytdDivChart"></canvas></div></div>
+</div>
+
+<!-- EMAIL DELIVERY TRACKER -->
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">📧 Email Delivery Tracker</span>
+    <span class="badge badge-blue">${EMAIL_LOG.length} sent</span>
+  </div>
+  <div class="card-body" style="padding:0">
+    ${EMAIL_LOG.length === 0
+      ? '<div style="text-align:center;padding:40px;color:#808285">No emails sent yet. Send reports from the Monthly Reports page.</div>'
+      : `<table>
+          <thead><tr><th>Student</th><th>Month</th><th>Type</th><th>Sent To</th><th>Sent At</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody>
+            ${EMAIL_LOG.slice(0,20).map(e => {
+              const s = getStudent(e.studentId);
+              return `<tr>
+                <td class="primary he">${s ? sName(s) : '—'}</td>
+                <td><span class="he" style="background:#005778;color:#fff;padding:2px 8px;border-radius:20px;font-size:0.7rem;font-weight:700">${getMonthLabel(e.month)}</span></td>
+                <td><span class="badge ${e.type==='combined'?'badge-gold':e.type==='report'?'badge-blue':'badge-teal'}">${e.type}</span></td>
+                <td style="font-size:0.78rem;color:#808285">${e.emails.join(', ')}</td>
+                <td style="font-size:0.76rem;color:#808285">${fmtTime(e.sentAt)}</td>
+                <td><span class="badge badge-success">✓ Sent</span></td>
+                <td><button class="btn btn-ghost btn-sm" onclick="resendEmail('${e.id}')">Resend</button></td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>`}
+  </div>
+</div>`;
+
+  setTimeout(() => {
+    // Division comparison radar/bar chart
+    const ctx1 = $('divCompChart');
+    if (ctx1) {
+      _charts.divComp = new Chart(ctx1, {
+        type: 'bar',
+        data: {
+          labels: CATS.map(c => c.label),
+          datasets: DIVISIONS.map(div => {
+            const ss = getDivisionStudents(div.id);
+            const ass = ASSESSMENTS.filter(a => ss.some(s => s.id === a.studentId));
+            return {
+              label: div.name,
+              backgroundColor: div.color + 'CC',
+              borderColor: div.color,
+              borderWidth: 2,
+              data: CATS.map(cat => ass.length ? Math.round(ass.reduce((s,a) => s+(a.categories[cat.id]?.correct||0),0)/ass.length*10)/10 : 0),
+            };
+          }),
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 10 } } }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: '#f0f0f0' } } } }
+      });
+    }
+
+    // YTD trend by division
+    const ctx2 = $('ytdDivChart');
+    if (ctx2) {
+      const months = HEB_MONTHS.slice(0, 9);
+      _charts.ytdDiv = new Chart(ctx2, {
+        type: 'line',
+        data: {
+          labels: months.map(m => m.label),
+          datasets: DIVISIONS.map(div => {
+            const ss = getDivisionStudents(div.id);
+            return {
+              label: div.name,
+              borderColor: div.color,
+              backgroundColor: div.color + '20',
+              tension: 0.4, fill: false, pointRadius: 4,
+              data: months.map(m => {
+                const ass = ASSESSMENTS.filter(a => ss.some(s => s.id === a.studentId) && a.month === m.id);
+                if (!ass.length) return null;
+                const total = CATS.reduce((sum, cat) => sum + ass.reduce((s,a) => s+(a.categories[cat.id]?.correct||0),0)/ass.length, 0);
+                return Math.round(total / CATS.length * 10) / 10;
+              }),
+            };
+          }),
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 10 } } }, scales: { x: { grid: { color: '#f5f5f5' } }, y: { beginAtZero: true, grid: { color: '#f5f5f5' } } } }
+      });
+    }
+  }, 80);
+}
+
+// ── BULK CSV IMPORT — STUDENTS ───────────────────────────────
+function downloadStudentTemplate() {
+  window.open('/students_template.csv', '_blank');
+  showToast('Student template downloaded', 'success');
+}
+
+function downloadProviderTemplate() {
+  window.open('/providers_template.csv', '_blank');
+  showToast('Provider template downloaded', 'success');
+}
+
+function openStudentCSVImport() {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,61,86,0.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px;box-shadow:0 24px 56px rgba(0,87,120,0.18);width:100%;max-width:680px;max-height:90vh;overflow-y:auto">
+      <div style="background:linear-gradient(135deg,#003d56,#005778);padding:18px 24px;border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:1rem;font-weight:800;color:#fff">Bulk Import Students</span>
+        <button onclick="this.closest('[style*=fixed]').remove()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;color:#fff;cursor:pointer;font-size:0.9rem">✕</button>
+      </div>
+      <div style="padding:24px">
+        <div style="display:flex;gap:10px;margin-bottom:16px">
+          <button class="btn btn-gold btn-sm" onclick="downloadStudentTemplate()">⬇ Download Excel Template</button>
+          <div style="font-size:0.82rem;color:#808285;align-self:center">Fill in the template, save as CSV, then upload below</div>
+        </div>
+        <div style="background:#e0eef5;border-radius:8px;padding:12px;margin-bottom:16px;font-size:0.82rem;color:#005778">
+          <strong>Columns:</strong> firstName, lastName, className, divisionName, providerName, parentEmail1, parentEmail2, year, notes
+        </div>
+        <div style="border:2px dashed #b0cfe0;border-radius:8px;padding:28px;text-align:center;cursor:pointer;background:#e0eef5" onclick="document.getElementById('stuCSVInput').click()">
+          <div style="font-size:2rem;margin-bottom:8px">📄</div>
+          <div style="font-weight:700;color:#005778">Click to select CSV file</div>
+          <div style="font-size:0.8rem;color:#808285;margin-top:4px">or drag and drop</div>
+          <input type="file" id="stuCSVInput" accept=".csv,.xlsx" style="display:none" onchange="previewStudentCSV(this)">
+        </div>
+        <div id="stuCSVPreview" style="margin-top:14px"></div>
+      </div>
+      <div style="padding:14px 24px;border-top:1px solid #e8d9b8;display:flex;gap:10px;background:#fdf8f0;border-radius:0 0 16px 16px">
+        <button class="btn btn-primary" onclick="importStudentCSV(this.closest('[style*=fixed]'))">Import Students</button>
+        <button class="btn btn-ghost" onclick="this.closest('[style*=fixed]').remove()">Cancel</button>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+let _stuCSVData = [];
+function previewStudentCSV(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const text = e.target.result.replace(/^\uFEFF/, '');
+    const lines = text.trim().split('\n');
+    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g,''));
+    _stuCSVData = lines.slice(1).map(line => {
+      const vals = line.split(',').map(v => v.trim().replace(/"/g,''));
+      const obj = {}; headers.forEach((h,i) => obj[h] = vals[i]||'');
+      return obj;
+    }).filter(row => row.firstName || row.lastName);
+
+    const preview = document.getElementById('stuCSVPreview');
+    if (!preview) return;
+    preview.innerHTML = `
+      <div style="font-size:0.84rem;font-weight:700;color:#005778;margin-bottom:8px">${_stuCSVData.length} students found</div>
+      <div style="overflow-x:auto;max-height:200px;border:1px solid #e8d9b8;border-radius:8px">
+        <table style="width:100%;border-collapse:collapse;font-size:0.78rem">
+          <thead><tr>${headers.slice(0,6).map(h=>`<th style="background:#005778;color:#fff;padding:6px 10px;text-align:right">${h}</th>`).join('')}</tr></thead>
+          <tbody>${_stuCSVData.slice(0,5).map((row,i)=>`<tr style="background:${i%2===0?'#fff':'#f8f9fa'}">${headers.slice(0,6).map(h=>`<td style="padding:5px 10px;border-bottom:1px solid #e8d9b8;text-align:right" class="he">${row[h]||''}</td>`).join('')}</tr>`).join('')}</tbody>
+        </table>
+      </div>
+      ${_stuCSVData.length > 5 ? `<div style="font-size:0.76rem;color:#808285;margin-top:6px">...and ${_stuCSVData.length-5} more rows</div>` : ''}`;
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function importStudentCSV(overlay) {
+  if (!_stuCSVData.length) { showToast('No data to import', 'warning'); return; }
+  let imported = 0, skipped = 0;
+  _stuCSVData.forEach(row => {
+    if (!row.firstName || !row.lastName) { skipped++; return; }
+    // Find class by name
+    const cls = CLASSES.find(c => c.name.toLowerCase() === (row.className||'').toLowerCase()) || CLASSES[0];
+    // Find provider by name
+    const prov = PROVIDERS.find(p => p.name.toLowerCase().includes((row.providerName||'').toLowerCase().split(' ').pop())) || null;
+    const emails = [];
+    if (row.parentEmail1) emails.push(row.parentEmail1);
+    if (row.parentEmail2) emails.push(row.parentEmail2);
+    STUDENTS.push({
+      id: genId('s'), firstName: row.firstName, lastName: row.lastName,
+      classId: cls ? cls.id : 'cls1', providerId: prov ? prov.id : '',
+      year: row.year || CUR_YEAR, status: 'active',
+      notes: row.notes || '', emails,
+    });
+    imported++;
+  });
+  $('studentsBadge') && ($('studentsBadge').textContent = STUDENTS.length);
+  overlay?.remove();
+  showToast(`✓ Imported ${imported} students${skipped > 0 ? ` (${skipped} skipped)` : ''}`, 'success');
+  _stuCSVData = [];
+  if (_page === 'students') renderStudents();
+}
+
+// ── BULK CSV IMPORT — PROVIDERS ──────────────────────────────
+function openProviderCSVImport() {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,61,86,0.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px;box-shadow:0 24px 56px rgba(0,87,120,0.18);width:100%;max-width:580px;max-height:90vh;overflow-y:auto">
+      <div style="background:linear-gradient(135deg,#003d56,#005778);padding:18px 24px;border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:1rem;font-weight:800;color:#fff">Bulk Import Providers</span>
+        <button onclick="this.closest('[style*=fixed]').remove()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;color:#fff;cursor:pointer;font-size:0.9rem">✕</button>
+      </div>
+      <div style="padding:24px">
+        <div style="display:flex;gap:10px;margin-bottom:16px">
+          <button class="btn btn-gold btn-sm" onclick="downloadProviderTemplate()">⬇ Download Template</button>
+        </div>
+        <div style="background:#e0eef5;border-radius:8px;padding:12px;margin-bottom:16px;font-size:0.82rem;color:#005778">
+          <strong>Columns:</strong> name, email, phone
+        </div>
+        <div style="border:2px dashed #b0cfe0;border-radius:8px;padding:28px;text-align:center;cursor:pointer;background:#e0eef5" onclick="document.getElementById('provCSVInput').click()">
+          <div style="font-size:2rem;margin-bottom:8px">📄</div>
+          <div style="font-weight:700;color:#005778">Click to select CSV file</div>
+          <input type="file" id="provCSVInput" accept=".csv" style="display:none" onchange="previewProviderCSV(this)">
+        </div>
+        <div id="provCSVPreview" style="margin-top:14px"></div>
+      </div>
+      <div style="padding:14px 24px;border-top:1px solid #e8d9b8;display:flex;gap:10px;background:#fdf8f0;border-radius:0 0 16px 16px">
+        <button class="btn btn-primary" onclick="importProviderCSV(this.closest('[style*=fixed]'))">Import Providers</button>
+        <button class="btn btn-ghost" onclick="this.closest('[style*=fixed]').remove()">Cancel</button>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+let _provCSVData = [];
+function previewProviderCSV(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const text = e.target.result.replace(/^\uFEFF/, '');
+    const lines = text.trim().split('\n');
+    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g,''));
+    _provCSVData = lines.slice(1).map(line => {
+      const vals = line.split(',').map(v => v.trim().replace(/"/g,''));
+      const obj = {}; headers.forEach((h,i) => obj[h] = vals[i]||'');
+      return obj;
+    }).filter(row => row.name);
+    const preview = document.getElementById('provCSVPreview');
+    if (preview) preview.innerHTML = `<div style="font-size:0.84rem;font-weight:700;color:#005778;margin-bottom:8px">${_provCSVData.length} providers found</div><div style="font-size:0.82rem;color:#444">${_provCSVData.map(r=>`${r.name} — ${r.email}`).join('<br>')}</div>`;
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function importProviderCSV(overlay) {
+  if (!_provCSVData.length) { showToast('No data to import', 'warning'); return; }
+  let imported = 0;
+  _provCSVData.forEach(row => {
+    if (!row.name) return;
+    PROVIDERS.push({ id: genId('prov'), name: row.name, email: row.email||'', phone: row.phone||'' });
+    imported++;
+  });
+  overlay?.remove();
+  showToast(`✓ Imported ${imported} providers`, 'success');
+  _provCSVData = [];
+  if (_page === 'programs') renderPrograms();
+}
+
+// ── PATCH NAVIGATE to include programs-analytics ─────────────
+const _origNavigate2 = navigate;
+navigate = function(page, params = {}) {
+  if (page === 'programs-analytics') {
+    _page = 'programs-analytics'; _params = params;
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    const navEl = document.querySelector('.nav-item[data-page="analytics"]');
+    if (navEl) navEl.classList.add('active');
+    const hb = $('headerBreadcrumb'); if (hb) hb.textContent = 'Programs Analytics';
+    const hs = $('headerSubBreadcrumb'); if (hs) hs.textContent = '';
+    destroyCharts();
+    const content = $('pageContent');
+    content.style.opacity = '0';
+    requestAnimationFrame(() => {
+      renderProgramsAnalytics();
+      content.style.transition = 'opacity 0.2s'; content.style.opacity = '1';
+      closeSidebar(); window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+    return;
+  }
+  _origNavigate2(page, params);
+};
+
+// ── PATCH STUDENTS PAGE to add CSV import button ─────────────
+const _origRenderStudents4 = renderStudents;
+renderStudents = function() {
+  _origRenderStudents4();
+  // Add CSV import button to page header
+  setTimeout(() => {
+    const header = $('pageContent')?.querySelector('.page-header > div:last-child');
+    if (header && !header.querySelector('[onclick*="StudentCSV"]')) {
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-outline btn-sm';
+      btn.setAttribute('onclick', 'openStudentCSVImport()');
+      btn.innerHTML = '📄 Bulk Import CSV';
+      header.insertBefore(btn, header.firstChild);
+    }
+  }, 50);
+};
+
+// ── PATCH PROGRAMS PAGE to add provider CSV import ───────────
+const _origRenderPrograms2 = renderPrograms;
+renderPrograms = function() {
+  _origRenderPrograms2();
+  // Add provider CSV import button
+  setTimeout(() => {
+    const header = $('pageContent')?.querySelector('.page-header > div:last-child');
+    if (header && !header.querySelector('[onclick*="ProviderCSV"]')) {
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-outline btn-sm';
+      btn.setAttribute('onclick', 'openProviderCSVImport()');
+      btn.innerHTML = '📄 Import Providers CSV';
+      header.insertBefore(btn, header.firstChild);
+    }
+  }, 50);
+};
+
+// ── PATCH ANALYTICS PAGE to add Programs Analytics link ──────
+const _origRenderAnalytics4 = renderAnalytics;
+renderAnalytics = function() {
+  _origRenderAnalytics4();
+  // Add Programs Analytics button at top
+  setTimeout(() => {
+    const header = $('pageContent')?.querySelector('.page-header');
+    if (header && !header.querySelector('[onclick*="programs-analytics"]')) {
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-gold btn-sm';
+      btn.setAttribute('onclick', "navigate('programs-analytics')");
+      btn.innerHTML = '🏫 Programs & Classes Analytics';
+      btn.style.marginBottom = '0';
+      const actions = header.querySelector('div:last-child') || header;
+      actions.appendChild(btn);
+    }
+  }, 50);
+};
+
+// ── PATCH REPORT SEND BUTTON to use combined email ───────────
+sendReportByEmail = function(sid, month, year) {
+  sendCombinedEmail(sid, month, year);
+};
+
+// ── PATCH STUDENT PROFILE to add email button ────────────────
+const _origRenderProfileOverview3 = renderProfileOverview;
+renderProfileOverview = function(sid, s, ass, lastA, prov) {
+  _origRenderProfileOverview3(sid, s, ass, lastA, prov);
+  // Add email management section
+  setTimeout(() => {
+    const profileContent = $('profileContent');
+    if (!profileContent) return;
+    const emailSection = document.createElement('div');
+    emailSection.className = 'card mt-6';
+    emailSection.style.marginTop = '18px';
+    const emails = s.emails || [];
+    emailSection.innerHTML = `
+      <div class="card-header">
+        <span class="card-title">📧 Parent Emails</span>
+        <button class="btn btn-outline btn-sm" onclick="openEditStudentEmailModal('${sid}')">Edit Emails</button>
+      </div>
+      <div class="card-body">
+        ${emails.length > 0
+          ? `<div style="display:flex;flex-direction:column;gap:8px">
+              ${emails.map(e => `<div style="display:flex;align-items:center;gap:10px;background:#e0eef5;border-radius:8px;padding:10px 14px"><span style="font-size:1rem">📧</span><span style="font-weight:600;color:#005778">${e}</span></div>`).join('')}
+             </div>
+             <div style="margin-top:12px;display:flex;gap:8px">
+               ${lastA ? `<button class="btn btn-primary btn-sm" onclick="sendCombinedEmail('${sid}','${lastA.month}','${lastA.year}')">📧 Send Latest Report + Video</button>` : ''}
+             </div>`
+          : `<div style="text-align:center;padding:20px;color:#808285">
+               <div style="font-size:1.5rem;margin-bottom:8px">📧</div>
+               <div style="font-weight:600;margin-bottom:6px">No parent emails on file</div>
+               <button class="btn btn-primary btn-sm" onclick="openEditStudentEmailModal('${sid}')">+ Add Parent Emails</button>
+             </div>`}
+      </div>`;
+    profileContent.appendChild(emailSection);
+  }, 100);
+};
+
+// ── SIDEBAR OFFSET — ensure content never overlaps ───────────
+(function fixSidebarOffset() {
+  const style = document.createElement('style');
+  style.textContent = `
+    .main-content { margin-left: 248px !important; }
+    .page-content { padding: 26px !important; }
+    @media (max-width: 900px) {
+      .main-content { margin-left: 0 !important; }
+    }
+  `;
+  document.head.appendChild(style);
+})();

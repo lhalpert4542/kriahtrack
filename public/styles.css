@@ -281,3 +281,9 @@ tbody td { text-align: right; }
   .sidebar.open { transform: translateX(0); }
   .mobile-menu-btn { display: flex; }
 }
+
+/* Email tracking */
+.email-status-sent { color: #1a6038; font-weight: 700; }
+.email-status-pending { color: #7a4800; font-weight: 700; }
+.email-status-failed { color: #9a1c1c; font-weight: 700; }
+.email-tracker-row { display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e8d9b8;font-size:0.82rem; }

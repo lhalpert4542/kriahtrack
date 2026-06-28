@@ -32,6 +32,10 @@
       <div class="nav-item" onclick="navigate('analytics')" data-page="analytics">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Analytics
       </div>
+      <div class="nav-item" onclick="navigate('programs-analytics')" data-page="programs-analytics" style="padding-right:28px;font-size:0.78rem;color:rgba(255,255,255,0.55)">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;opacity:0.6"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Programs Analytics
+      </div>
       <div class="nav-section-label">Management</div>
       <div class="nav-item" onclick="navigate('students')" data-page="students">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Students
@@ -221,7 +225,7 @@
         <div style="font-size:2rem;margin-bottom:8px">📄</div>
         <div style="font-weight:700;color:#005778">Click to select CSV file</div>
         <div style="font-size:0.8rem;color:#808285;margin-top:4px">or drag and drop</div>
-        <input type="file" id="csvFileInput" accept=".csv" style="display:none" onchange="previewCSV(this)">
+        <input type="file" id="csvFileInput" accept=".csv"  onchange="previewCSV(this)">
       </div>
       <div id="csvPreview" style="margin-top:14px"></div>
     </div>
