@@ -12,14 +12,55 @@ const HEB_YEARS = ['תשפ״ו','תשפ״ז','תשפ״ח','תשפ״ט'];
 function yearSelect(selectedYear) {
   return HEB_YEARS.map(y => `<option value="${y}" ${y===selectedYear?'selected':''}>${y}</option>`).join('');
 }
-// Single school, multiple classes
-let SCHOOL = { name: 'מוסד הקריאה', classes: ['א׳','ב׳','ג׳','ד׳','ה׳','ו׳'] };
-let KRIAH_DIRECTOR = { name: '', email: '' }; // Set by admin
-let PROVIDERS=[{id:'p1',name:'כיתה א׳',director:'הרב משה לוי',email:'moshe@school.edu',city:'',classes:['א׳']},{id:'p2',name:'כיתה ב׳',director:'הרב אברהם כהן',email:'avraham@school.edu',city:'',classes:['ב׳']},{id:'p3',name:'כיתה ג׳',director:'הרב יצחק שפירא',email:'yitzchak@school.edu',city:'',classes:['ג׳']},{id:'p4',name:'כיתה ד׳',director:'הרב נחמן גרין',email:'nachman@school.edu',city:'',classes:['ד׳']}];
+let SCHOOL = { name: 'Ichud Boys Program' };
+let KRIAH_DIRECTOR = { name: '', email: '', title: 'Kriah Director' };
+
+// CLASSES — each belongs to a division (program)
+// classId is used as providerId on students for class assignment
+let CLASSES = [
+  { id: 'cls1', name: 'Aleph',  divisionId: 'div_ahuvim',    grade: '1st' },
+  { id: 'cls2', name: 'Beis',   divisionId: 'div_ahuvim',    grade: '2nd' },
+  { id: 'cls3', name: 'Gimmel', divisionId: 'div_nechmudim', grade: '3rd' },
+  { id: 'cls4', name: 'Daled',  divisionId: 'div_nechmudim', grade: '4th' },
+  { id: 'cls5', name: 'Hey',    divisionId: 'div_masmidim',  grade: '5th' },
+  { id: 'cls6', name: 'Vov',    divisionId: 'div_masmidim',  grade: '6th' },
+];
+
+// PROVIDERS — staff members, each works 1:1 with students
+// Students are assigned to a provider (their Kriah teacher)
+let PROVIDERS = [
+  { id: 'prov1', name: 'Rabbi Goldstein',  email: 'goldstein@ichud.edu',  phone: '', studentIds: [] },
+  { id: 'prov2', name: 'Rabbi Friedman',   email: 'friedman@ichud.edu',   phone: '', studentIds: [] },
+  { id: 'prov3', name: 'Rabbi Schwartz',   email: 'schwartz@ichud.edu',   phone: '', studentIds: [] },
+  { id: 'prov4', name: 'Rabbi Weiss',      email: 'weiss@ichud.edu',      phone: '', studentIds: [] },
+];
+
+// Assign programs to classes
+PROGRAMS[0].classIds = ['cls1','cls2'];
+PROGRAMS[1].classIds = ['cls3','cls4'];
+PROGRAMS[2].classIds = ['cls5','cls6'];
+
 // Report finalization state
 let REPORT_FINALS = {}; // key: studentId_month_year -> {finalized, note, lang}
 
-let STUDENTS=[{id:'s1',firstName:'יוסף',lastName:'כהן',providerId:'p1',class:'א׳',year:'תשפ״ו',status:'active',notes:''},{id:'s2',firstName:'מנחם',lastName:'לוי',providerId:'p1',class:'א׳',year:'תשפ״ו',status:'active',notes:''},{id:'s3',firstName:'אברהם',lastName:'גולדברג',providerId:'p1',class:'ב׳',year:'תשפ״ו',status:'active',notes:''},{id:'s4',firstName:'שמואל',lastName:'רוזנברג',providerId:'p2',class:'א׳',year:'תשפ״ו',status:'active',notes:''},{id:'s5',firstName:'דוד',lastName:'פרידמן',providerId:'p2',class:'ב׳',year:'תשפ״ו',status:'active',notes:''},{id:'s6',firstName:'ישראל',lastName:'ברגר',providerId:'p3',class:'א׳',year:'תשפ״ו',status:'active',notes:''},{id:'s7',firstName:'מרדכי',lastName:'שטיין',providerId:'p3',class:'ב׳',year:'תשפ״ו',status:'active',notes:''},{id:'s8',firstName:'פנחס',lastName:'וייס',providerId:'p3',class:'ג׳',year:'תשפ״ו',status:'active',notes:''},{id:'s9',firstName:'אליהו',lastName:'שוורץ',providerId:'p4',class:'א׳',year:'תשפ״ו',status:'active',notes:''},{id:'s10',firstName:'נחמן',lastName:'גרינבאום',providerId:'p4',class:'ב׳',year:'תשפ״ו',status:'active',notes:''},{id:'s11',firstName:'חיים',lastName:'בלום',providerId:'p1',class:'ג׳',year:'תשפ״ו',status:'active',notes:''},{id:'s12',firstName:'זלמן',lastName:'הורוביץ',providerId:'p2',class:'א׳',year:'תשפ״ו',status:'active',notes:''}];
+// STUDENTS — each has classId (their class) + providerId (their 1:1 Kriah teacher)
+let STUDENTS=[
+  {id:'s1', firstName:'יוסף',  lastName:'כהן',      classId:'cls1', providerId:'prov1', year:'תשפ״ו', status:'active', notes:''},
+  {id:'s2', firstName:'מנחם',  lastName:'לוי',      classId:'cls1', providerId:'prov1', year:'תשפ״ו', status:'active', notes:''},
+  {id:'s3', firstName:'אברהם', lastName:'גולדברג',  classId:'cls2', providerId:'prov2', year:'תשפ״ו', status:'active', notes:''},
+  {id:'s4', firstName:'שמואל', lastName:'רוזנברג',  classId:'cls2', providerId:'prov2', year:'תשפ״ו', status:'active', notes:''},
+  {id:'s5', firstName:'דוד',   lastName:'פרידמן',   classId:'cls3', providerId:'prov3', year:'תשפ״ו', status:'active', notes:''},
+  {id:'s6', firstName:'ישראל', lastName:'ברגר',     classId:'cls3', providerId:'prov3', year:'תשפ״ו', status:'active', notes:''},
+  {id:'s7', firstName:'מרדכי', lastName:'שטיין',    classId:'cls4', providerId:'prov4', year:'תשפ״ו', status:'active', notes:''},
+  {id:'s8', firstName:'פנחס',  lastName:'וייס',     classId:'cls4', providerId:'prov4', year:'תשפ״ו', status:'active', notes:''},
+  {id:'s9', firstName:'אליהו', lastName:'שוורץ',    classId:'cls5', providerId:'prov1', year:'תשפ״ו', status:'active', notes:''},
+  {id:'s10',firstName:'נחמן',  lastName:'גרינבאום', classId:'cls5', providerId:'prov2', year:'תשפ״ו', status:'active', notes:''},
+  {id:'s11',firstName:'חיים',  lastName:'בלום',     classId:'cls6', providerId:'prov3', year:'תשפ״ו', status:'active', notes:''},
+  {id:'s12',firstName:'זלמן',  lastName:'הורוביץ',  classId:'cls6', providerId:'prov4', year:'תשפ״ו', status:'active', notes:''},
+];
+// Sync provider caseloads
+PROVIDERS.forEach(p => { p.studentIds = STUDENTS.filter(s => s.providerId === p.id).map(s => s.id); });
+
 let ASSESSMENTS=[],SYS_LOGS=[{id:'l1',type:'success',message:'KriahTrack initialized with demo data',timestamp:new Date().toISOString()},{id:'l2',type:'info',message:'12 students, 4 providers, demo assessments loaded',timestamp:new Date().toISOString()}],AUDIT_LOG=[],OCR_IMPORTS=[];
 (function seed(){const months=['tishrei','cheshvan','kislev','tevet','shvat','adar','nisan','iyar','sivan'];STUDENTS.forEach(s=>{const base=10+Math.floor(Math.random()*12);months.forEach((m,mi)=>{if(Math.random()>0.12){const g=mi*1.2,n=()=>Math.floor(Math.random()*4)-1;ASSESSMENTS.push({id:`a_${s.id}_${m}`,studentId:s.id,providerId:s.providerId,month:m,year:CUR_YEAR,source:'manual',createdAt:new Date().toISOString(),categories:{otiyot:{correct:Math.max(0,Math.min(30,Math.floor(base+g+n()+8))),mistakes:Math.max(0,Math.floor(7-g*0.3+Math.abs(n())))},ot_nekuda:{correct:Math.max(0,Math.min(28,Math.floor(base+g+n()+4))),mistakes:Math.max(0,Math.floor(9-g*0.3+Math.abs(n())))},ot_nekuda_ot:{correct:Math.max(0,Math.min(25,Math.floor(base+g+n()))),mistakes:Math.max(0,Math.floor(11-g*0.3+Math.abs(n())))},milim:{correct:Math.max(0,Math.min(22,Math.floor(base+g+n()-2))),mistakes:Math.max(0,Math.floor(9-g*0.3+Math.abs(n())))},tehilim:{correct:Math.max(0,Math.min(20,Math.floor(base+g+n()-4))),mistakes:Math.max(0,Math.floor(7-g*0.3+Math.abs(n())))}}});}});});})();
 
@@ -2179,8 +2220,11 @@ setTimeout(() => {
 // ============================================================
 
 // ── PROGRAMS DATA ────────────────────────────────────────────
+// Divisions of Ichud Boys Program
 let PROGRAMS = [
-  { id: 'prog1', name: 'Kriah Program', description: 'Main reading program', classIds: ['p1','p2','p3','p4'] },
+  { id: 'div_ahuvim',    name: 'Ahuvim',    description: 'Division 1', classIds: [] },
+  { id: 'div_nechmudim', name: 'Nechmudim', description: 'Division 2', classIds: [] },
+  { id: 'div_masmidim',  name: 'Masmidim',  description: 'Division 3', classIds: [] },
 ];
 
 function getProgram(id) { return PROGRAMS.find(p => p.id === id); }
@@ -2547,4 +2591,583 @@ renderAnalytics = function() {
       </div>`;
     content.appendChild(progSection);
   }, 100);
+};
+
+// ============================================================
+// NEW DATA MODEL — Ichud Boys Program
+// School → Divisions → Classes → Students + Providers (1:1)
+// ============================================================
+
+// ── HELPER OVERRIDES for new model ──────────────────────────
+function getClass(id) { return CLASSES.find(c => c.id === id); }
+function getClassDivision(classId) { const cls = getClass(classId); return cls ? PROGRAMS.find(p => p.id === cls.divisionId) : null; }
+function getDivisionClasses(divId) { return CLASSES.filter(c => c.divisionId === divId); }
+function getDivisionStudents(divId) { const cls = getDivisionClasses(divId); return STUDENTS.filter(s => cls.some(c => c.id === s.classId)); }
+function getClassStudents(classId) { return STUDENTS.filter(s => s.classId === classId); }
+function getProviderStudentsNew(provId) { return STUDENTS.filter(s => s.providerId === provId); }
+function getStudentClass(sid) { const s = getStudent(sid); return s ? getClass(s.classId) : null; }
+function getStudentDivision(sid) { const s = getStudent(sid); return s ? getClassDivision(s.classId) : null; }
+function getStudentProvider(sid) { const s = getStudent(sid); return s ? PROVIDERS.find(p => p.id === s.providerId) : null; }
+
+// Override getProviderStudents to use new model
+getProviderStudents = function(id) {
+  // id could be a class id or provider id
+  if (CLASSES.find(c => c.id === id)) return getClassStudents(id);
+  return getProviderStudentsNew(id);
+};
+
+// Override getProvider to handle both classes and providers
+getProvider = function(id) {
+  const cls = CLASSES.find(c => c.id === id);
+  if (cls) return { id: cls.id, name: cls.name, director: '', email: '', classes: [cls.name] };
+  return PROVIDERS.find(p => p.id === id) || null;
+};
+
+// ── DASHBOARD OVERRIDE — show school name + divisions ────────
+const _origRenderDashboard2 = renderDashboard;
+renderDashboard = function() {
+  const total = ASSESSMENTS.length;
+  const monthly = ASSESSMENTS.filter(a => a.month === CUR_MONTH).length;
+  const improving = STUDENTS.filter(s => getStudentTrend(s.id) === 'up').length;
+  const struggling = STUDENTS.filter(s => getStudentTrend(s.id) === 'down').length;
+  const alerts = getAlerts();
+
+  $('pageContent').innerHTML = `
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Dashboard</h1>
+    <p class="page-subtitle" style="font-size:1rem;font-weight:700;color:#005778">Ichud Boys Program — Kriah Tracking</p>
+    <p class="page-subtitle">Year-to-date — <span class="he">${CUR_YEAR}</span></p>
+  </div>
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-outline btn-sm" onclick="navigate('analytics')">Analytics</button>
+    <button class="btn btn-primary btn-sm" onclick="navigate('ocr')">Upload Worksheet</button>
+  </div>
+</div>
+
+<!-- DIVISION SUMMARY CARDS -->
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px">
+  ${PROGRAMS.map((div, i) => {
+    const divStudents = getDivisionStudents(div.id);
+    const divClasses = getDivisionClasses(div.id);
+    const divImp = divStudents.filter(s => getStudentTrend(s.id) === 'up').length;
+    const divStr = divStudents.filter(s => getStudentTrend(s.id) === 'down').length;
+    const colors = ['#005778','#1a7a9a','#003d56'];
+    return `<div class="card" style="cursor:pointer;border-top:4px solid ${colors[i]}" onclick="navigate('providers')">
+      <div class="card-body" style="padding:16px">
+        <div style="font-size:1rem;font-weight:800;color:${colors[i]};margin-bottom:10px">${div.name}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">
+          <div><div style="font-size:1.3rem;font-weight:900;color:#1a2a2a">${divClasses.length}</div><div style="font-size:0.68rem;color:#808285">Classes</div></div>
+          <div><div style="font-size:1.3rem;font-weight:900;color:#005778">${divStudents.length}</div><div style="font-size:0.68rem;color:#808285">Students</div></div>
+          <div><div style="font-size:1.3rem;font-weight:900;color:#1a6038">${divImp}</div><div style="font-size:0.68rem;color:#808285">Improving</div></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('')}
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi-card" onclick="navigate('students')" style="cursor:pointer">
+    <div class="kpi-icon" style="background:#e0eef5;color:#005778"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+    <div class="kpi-value">${STUDENTS.length}</div><div class="kpi-label">Total Students</div>
+    <div class="kpi-trend up">↑ <span class="he">${CUR_YEAR}</span></div>
+  </div>
+  <div class="kpi-card gold" onclick="navigate('providers')" style="cursor:pointer">
+    <div class="kpi-icon" style="background:#fdf3e3;color:#D9A44E"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
+    <div class="kpi-value">${CLASSES.length}</div><div class="kpi-label">Classes</div>
+    <div class="kpi-trend neutral">${PROVIDERS.length} providers</div>
+  </div>
+  <div class="kpi-card success">
+    <div class="kpi-icon" style="background:#e4f2eb;color:#1a6038"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+    <div class="kpi-value">${total}</div><div class="kpi-label">YTD Assessments</div>
+    <div class="kpi-trend up">↑ ${monthly} this month</div>
+  </div>
+  <div class="kpi-card ${improving>=struggling?'success':'warning'}">
+    <div class="kpi-icon" style="background:${improving>=struggling?'#e4f2eb':'#fff3e0'};color:${improving>=struggling?'#1a6038':'#7a4800'}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div>
+    <div class="kpi-value">${improving}</div><div class="kpi-label">Improving</div>
+    <div class="kpi-trend ${struggling>0?'down':'up'}">${struggling} need attention</div>
+  </div>
+</div>
+
+${alerts.length ? `<div class="card mb-6"><div class="card-header"><span class="card-title">Active Alerts</span><span class="badge badge-danger">${alerts.length}</span></div><div class="card-body" style="padding:14px"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px">${alerts.slice(0,6).map(a=>`<div class="alert alert-${a.type}" style="margin:0;cursor:pointer" onclick="navigate('student_profile',{studentId:'${a.studentId}'})"><div><div style="font-weight:700;font-size:0.84rem">${a.title}</div><div style="font-size:0.76rem;margin-top:2px">${a.message}</div></div></div>`).join('')}</div></div></div>` : ''}
+
+<div class="grid-2 mb-6">
+  <div class="card"><div class="card-header"><span class="card-title">Category Trends — YTD</span></div><div class="card-body"><div class="chart-container"><canvas id="catChart"></canvas></div></div></div>
+  <div class="card"><div class="card-header"><span class="card-title">Division Comparison</span></div><div class="card-body"><div class="chart-container"><canvas id="divChart"></canvas></div></div></div>
+</div>
+
+<div class="grid-2">
+  <div class="card"><div class="card-header"><span class="card-title">Recent Activity</span><button class="btn btn-ghost btn-sm" onclick="navigate('admin')">View All</button></div><div class="card-body" style="padding:0 20px">${SYS_LOGS.slice(0,6).map(l=>`<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid #e8d9b8;font-size:0.82rem"><div style="width:7px;height:7px;border-radius:50%;margin-top:5px;flex-shrink:0;background:${{success:'#1a6038',warning:'#D9A44E',danger:'#9a1c1c',info:'#005778'}[l.type]||'#808285'}"></div><div style="font-size:0.7rem;color:#808285;white-space:nowrap;min-width:80px">${fmtTime(l.timestamp)}</div><div style="flex:1;color:#444">${l.message}</div></div>`).join('')}</div></div>
+  <div class="card"><div class="card-header"><span class="card-title">Students — <span class="he">סיון תשפ״ו</span></span><button class="btn btn-ghost btn-sm" onclick="navigate('students')">All Students</button></div><div class="card-body" style="padding:0"><table><thead><tr><th>Student</th><th>Class</th><th>Division</th><th>Trend</th></tr></thead><tbody>${STUDENTS.slice(0,7).map((s,i)=>{const t=getStudentTrend(s.id),cls=getClass(s.classId),div=getClassDivision(s.classId);return`<tr class="clickable" onclick="navigate('student_profile',{studentId:'${s.id}'})"><td class="primary"><div style="display:flex;align-items:center;gap:8px"><div class="user-avatar" style="width:28px;height:28px;font-size:0.65rem;background:${avatarColor(i)}">${initials(sName(s))}</div><span class="he">${sName(s)}</span></div></td><td style="font-size:0.8rem">${cls?cls.name:'—'}</td><td style="font-size:0.8rem;color:#005778;font-weight:600">${div?div.name:'—'}</td><td>${trendIcon(t)}</td></tr>`;}).join('')}</tbody></table></div></div>
+</div>`;
+
+  setTimeout(() => {
+    const c1 = $('catChart');
+    if (c1) { const months=HEB_MONTHS.slice(0,9);_charts.cat=new Chart(c1,{type:'line',data:{labels:months.map(m=>m.label),datasets:CATS.map(cat=>({label:cat.label,tension:0.4,fill:false,pointRadius:3,borderColor:cat.color,backgroundColor:cat.color+'20',data:months.map(m=>{const ass=ASSESSMENTS.filter(a=>a.month===m.id);return ass.length?Math.round(ass.reduce((s,a)=>s+(a.categories[cat.id]?.correct||0),0)/ass.length*10)/10:null;})}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10},padding:8}}},scales:{x:{grid:{color:'#f0f0f0'}},y:{beginAtZero:true,grid:{color:'#f0f0f0'}}}}}); }
+    const c2 = $('divChart');
+    if (c2) { _charts.div=new Chart(c2,{type:'bar',data:{labels:PROGRAMS.map(p=>p.name),datasets:CATS.map(cat=>({label:cat.label,backgroundColor:cat.color+'CC',borderColor:cat.color,borderWidth:1,data:PROGRAMS.map(p=>{const ss=getDivisionStudents(p.id),ass=ASSESSMENTS.filter(a=>ss.some(s=>s.id===a.studentId));return ass.length?Math.round(ass.reduce((s,a)=>s+(a.categories[cat.id]?.correct||0),0)/ass.length*10)/10:0;})}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10},padding:6}}},scales:{x:{grid:{display:false}},y:{beginAtZero:true,grid:{color:'#f0f0f0'}}}}}); }
+  }, 80);
+};
+
+// ── PROVIDERS PAGE — Divisions + Classes + Providers ─────────
+renderProviders = function() {
+  $('pageContent').innerHTML = `
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Ichud Boys Program</h1>
+    <p class="page-subtitle">Divisions · Classes · Providers</p>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn btn-outline btn-sm" onclick="openCSVImport()">📄 Import CSV</button>
+    <button class="btn btn-outline btn-sm" onclick="openAddClassModal()">+ Add Class</button>
+    <button class="btn btn-primary btn-sm" onclick="openAddProviderModalNew()">+ Add Provider</button>
+  </div>
+</div>
+
+<!-- KRIAH DIRECTOR -->
+<div class="card mb-4" style="border-top:4px solid #D9A44E">
+  <div class="card-header" style="background:linear-gradient(135deg,#003d56,#005778)">
+    <span class="card-title" style="color:#fff">⭐ Kriah Director</span>
+    <button class="btn btn-sm" style="background:rgba(217,164,78,0.2);color:#D9A44E;border:1px solid #D9A44E" onclick="editKriahDirector()">Edit</button>
+  </div>
+  <div class="card-body">
+    ${KRIAH_DIRECTOR.name
+      ? `<div style="display:flex;align-items:center;gap:14px"><div class="user-avatar" style="width:48px;height:48px;font-size:1rem;background:linear-gradient(135deg,#D9A44E,#b8832e)">${KRIAH_DIRECTOR.name.split(' ').map(w=>w[0]).join('').slice(0,2)}</div><div><div style="font-size:1.05rem;font-weight:800;color:#005778">${KRIAH_DIRECTOR.name}</div><div style="font-size:0.84rem;color:#808285;margin-top:2px">${KRIAH_DIRECTOR.email}</div><div style="font-size:0.72rem;color:#D9A44E;font-weight:700;margin-top:4px;text-transform:uppercase;letter-spacing:0.5px">Oversees all divisions</div></div></div>`
+      : `<div style="text-align:center;padding:12px"><button class="btn btn-gold btn-sm" onclick="editKriahDirector()">+ Set Kriah Director</button></div>`}
+  </div>
+</div>
+
+<!-- DIVISIONS with classes -->
+${PROGRAMS.map((div, di) => {
+  const divClasses = getDivisionClasses(div.id);
+  const divStudents = getDivisionStudents(div.id);
+  const colors = ['#005778','#1a7a9a','#003d56'];
+  return `
+<div class="card mb-4" style="border-top:4px solid ${colors[di]}">
+  <div class="card-header" style="background:linear-gradient(135deg,${colors[di]},${colors[di]}cc)">
+    <span class="card-title" style="color:#fff;font-size:1rem">${div.name} Division</span>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="color:rgba(255,255,255,0.7);font-size:0.8rem">${divClasses.length} classes · ${divStudents.length} students</span>
+      <button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3)" onclick="openAddClassModal('${div.id}')">+ Class</button>
+    </div>
+  </div>
+  <div class="card-body">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
+      ${divClasses.map((cls, ci) => {
+        const clsStudents = getClassStudents(cls.id);
+        const clsImp = clsStudents.filter(s => getStudentTrend(s.id) === 'up').length;
+        return `<div style="border:1px solid #e8d9b8;border-radius:10px;overflow:hidden;cursor:pointer;transition:all 0.2s" onclick="navigate('provider_profile',{providerId:'${cls.id}'})" onmouseenter="this.style.boxShadow='0 4px 12px rgba(0,87,120,0.15)'" onmouseleave="this.style.boxShadow=''">
+          <div style="background:${colors[di]};padding:10px 14px;color:#fff;display:flex;align-items:center;justify-content:space-between">
+            <div><div style="font-weight:800;font-size:0.9rem">${cls.name}</div><div style="font-size:0.7rem;opacity:0.8">${cls.grade}</div></div>
+            <div style="text-align:center"><div style="font-size:1.3rem;font-weight:900">${clsStudents.length}</div><div style="font-size:0.62rem;opacity:0.8">students</div></div>
+          </div>
+          <div style="padding:8px 14px;background:#fff;font-size:0.78rem;color:#808285">
+            <span style="color:#1a6038;font-weight:700">${clsImp} improving</span>
+          </div>
+        </div>`;
+      }).join('')}
+      ${divClasses.length === 0 ? '<div style="color:#808285;font-size:0.84rem;padding:8px">No classes yet — click "+ Class" to add</div>' : ''}
+    </div>
+  </div>
+</div>`;
+}).join('')}
+
+<!-- PROVIDERS (staff caseloads) -->
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">Providers — Staff Caseloads (${PROVIDERS.length})</span>
+    <button class="btn btn-primary btn-sm" onclick="openAddProviderModalNew()">+ Add Provider</button>
+  </div>
+  <div class="table-wrapper">
+    <table>
+      <thead><tr><th>Provider</th><th>Email</th><th>Students (Caseload)</th><th>Actions</th></tr></thead>
+      <tbody>
+        ${PROVIDERS.map((prov, i) => {
+          const studs = getProviderStudentsNew(prov.id);
+          return `<tr>
+            <td class="primary"><div style="display:flex;align-items:center;gap:8px"><div class="user-avatar" style="width:30px;height:30px;font-size:0.65rem;background:${avatarColor(i)}">${initials(prov.name)}</div>${prov.name}</div></td>
+            <td style="font-size:0.82rem;color:#808285">${prov.email}</td>
+            <td>
+              <div style="display:flex;flex-wrap:wrap;gap:5px">
+                ${studs.map(s => `<span class="he" style="background:#e0eef5;color:#005778;padding:2px 8px;border-radius:20px;font-size:0.75rem;font-weight:600;cursor:pointer" onclick="navigate('student_profile',{studentId:'${s.id}'})">${sName(s)}</span>`).join('')}
+                ${studs.length === 0 ? '<span style="color:#808285;font-size:0.8rem">No students assigned</span>' : ''}
+              </div>
+            </td>
+            <td><button class="btn btn-outline btn-sm" onclick="editProviderCaseload('${prov.id}')">Edit Caseload</button></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>
+</div>`;
+};
+
+// ── ADD CLASS MODAL ──────────────────────────────────────────
+function openAddClassModal(divisionId) {
+  const divName = divisionId ? PROGRAMS.find(p=>p.id===divisionId)?.name : '';
+  const name = prompt(`Class name${divName?' for '+divName:''}:`, '');
+  if (!name) return;
+  const grade = prompt('Grade (e.g. 1st, 2nd):', '');
+  const targetDiv = divisionId || prompt(`Division:\n${PROGRAMS.map((p,i)=>`${i+1}. ${p.name}`).join('\n')}\nEnter number:`, '1');
+  const divId = divisionId || PROGRAMS[parseInt(targetDiv)-1]?.id || PROGRAMS[0].id;
+  const newClass = { id: genId('cls'), name: name.trim(), divisionId: divId, grade: (grade||'').trim() };
+  CLASSES.push(newClass);
+  // Add to division's classIds
+  const div = PROGRAMS.find(p => p.id === divId);
+  if (div) div.classIds.push(newClass.id);
+  showToast(`Class "${name}" added to ${PROGRAMS.find(p=>p.id===divId)?.name}`, 'success');
+  navigate('providers');
+}
+
+// ── ADD PROVIDER MODAL ───────────────────────────────────────
+function openAddProviderModalNew() {
+  const name = prompt('Provider name (e.g. Rabbi Goldstein):', '');
+  if (!name) return;
+  const email = prompt('Email:', '');
+  const phone = prompt('Phone (optional):', '');
+  const newProv = { id: genId('prov'), name: name.trim(), email: (email||'').trim(), phone: (phone||'').trim(), studentIds: [] };
+  PROVIDERS.push(newProv);
+  showToast(`Provider "${name}" added`, 'success');
+  navigate('providers');
+}
+
+// ── EDIT PROVIDER CASELOAD ───────────────────────────────────
+function editProviderCaseload(provId) {
+  const prov = PROVIDERS.find(p => p.id === provId);
+  if (!prov) return;
+  const unassigned = STUDENTS.filter(s => !s.providerId || s.providerId === provId);
+  const current = getProviderStudentsNew(provId);
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,61,86,0.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px;box-shadow:0 24px 56px rgba(0,87,120,0.18);width:100%;max-width:600px;max-height:85vh;overflow-y:auto">
+      <div style="background:linear-gradient(135deg,#003d56,#005778);padding:18px 24px;border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:1rem;font-weight:800;color:#fff">Caseload — ${prov.name}</span>
+        <button onclick="this.closest('[style*=fixed]').remove()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;color:#fff;cursor:pointer;font-size:0.9rem">✕</button>
+      </div>
+      <div style="padding:20px">
+        <div style="font-size:0.84rem;font-weight:700;color:#808285;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">Current Students (${current.length})</div>
+        <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:18px">
+          ${current.map(s => `<div style="display:flex;align-items:center;gap:6px;background:#e0eef5;border:1px solid #b0cfe0;border-radius:20px;padding:4px 12px">
+            <span class="he" style="font-size:0.82rem;font-weight:700;color:#005778">${sName(s)}</span>
+            <button onclick="removeFromCaseload('${provId}','${s.id}',this)" style="background:none;border:none;color:#9a1c1c;cursor:pointer;font-size:0.8rem;padding:0;line-height:1">✕</button>
+          </div>`).join('')}
+          ${current.length === 0 ? '<span style="color:#808285;font-size:0.84rem">No students assigned</span>' : ''}
+        </div>
+        <div style="font-size:0.84rem;font-weight:700;color:#808285;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">Add Students</div>
+        <div style="max-height:200px;overflow-y:auto;border:1px solid #e8d9b8;border-radius:8px">
+          ${STUDENTS.filter(s => s.providerId !== provId).map(s => {
+            const cls = getClass(s.classId);
+            const div = getClassDivision(s.classId);
+            return `<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border-bottom:1px solid #e8d9b8;font-size:0.84rem">
+              <div>
+                <span class="he" style="font-weight:700">${sName(s)}</span>
+                <span style="color:#808285;font-size:0.76rem;margin-right:8px"> — ${cls?cls.name:''} ${div?'('+div.name+')':''}</span>
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="addToCaseload('${provId}','${s.id}',this)">+ Add</button>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+function addToCaseload(provId, studentId, btn) {
+  const s = STUDENTS.find(x => x.id === studentId);
+  if (!s) return;
+  // Remove from old provider
+  if (s.providerId) {
+    const oldProv = PROVIDERS.find(p => p.id === s.providerId);
+    if (oldProv) oldProv.studentIds = oldProv.studentIds.filter(id => id !== studentId);
+  }
+  s.providerId = provId;
+  const prov = PROVIDERS.find(p => p.id === provId);
+  if (prov && !prov.studentIds.includes(studentId)) prov.studentIds.push(studentId);
+  if (btn) { btn.textContent = '✓ Added'; btn.disabled = true; btn.style.background = '#1a6038'; }
+  showToast(`${sName(s)} added to caseload`, 'success');
+}
+
+function removeFromCaseload(provId, studentId, btn) {
+  const s = STUDENTS.find(x => x.id === studentId);
+  if (!s) return;
+  s.providerId = '';
+  const prov = PROVIDERS.find(p => p.id === provId);
+  if (prov) prov.studentIds = prov.studentIds.filter(id => id !== studentId);
+  if (btn) btn.closest('[style*="border-radius:20px"]')?.remove();
+  showToast(`${sName(s)} removed from caseload`, 'warning');
+}
+
+// ── STUDENT PROFILE — show class + division + provider ───────
+const _origRenderStudentProfile2 = renderStudentProfile;
+renderStudentProfile = function(sid) {
+  const s = getStudent(sid);
+  if (!s) { $('pageContent').innerHTML = '<div style="padding:40px">Student not found</div>'; return; }
+  const ass = getStudentAssessments(sid);
+  const cls = getClass(s.classId);
+  const div = getClassDivision(s.classId);
+  const prov = getStudentProvider(sid);
+  const t = getStudentTrend(sid);
+  const lastA = ass[ass.length - 1];
+  const hs = $('headerSubBreadcrumb');
+  if (hs) hs.innerHTML = ` › <span class="he">${sName(s)}</span>`;
+
+  $('pageContent').innerHTML = `
+<div style="margin-bottom:14px"><button class="btn btn-ghost btn-sm" onclick="navigate('students')">← Back to Students</button></div>
+<div class="student-profile-header">
+  <div style="display:flex;align-items:center;gap:18px">
+    <div class="user-avatar" style="width:64px;height:64px;font-size:1.4rem;flex-shrink:0">${initials(sName(s))}</div>
+    <div style="flex:1;text-align:right">
+      <div class="he" style="font-size:1.5rem;font-weight:900;color:#fff;line-height:1.2">${sName(s)}</div>
+      <div style="font-size:0.95rem;font-weight:700;color:rgba(255,255,255,0.85);margin-top:3px">${cls ? cls.name : s.class || '—'}</div>
+      <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;justify-content:flex-end">
+        ${div ? `<span style="background:rgba(217,164,78,0.3);color:#D9A44E;font-size:0.72rem;font-weight:800;padding:2px 9px;border-radius:20px;border:1px solid rgba(217,164,78,0.4)">${div.name}</span>` : ''}
+        ${prov ? `<span style="font-size:0.8rem;color:rgba(255,255,255,0.75)">Provider: ${prov.name}</span>` : ''}
+        <span class="he" style="font-size:0.8rem;color:rgba(255,255,255,0.7)">${s.year}</span>
+        ${trendBadge(t)}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0">
+      <button class="btn btn-gold btn-sm" onclick="openAddAssessmentModal('${sid}')">+ Assessment</button>
+      <button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3)" onclick="${lastA ? `showStudentReport('${sid}','${lastA.month}','${lastA.year}')` : "showToast('No assessments yet','warning')"}">📄 Report</button>
+      <button class="btn btn-sm" style="background:rgba(217,164,78,0.3);color:#fff;border:1px solid rgba(217,164,78,0.5)" onclick="showFinalReports('${sid}')">✓ Finals</button>
+    </div>
+  </div>
+</div>
+
+<div style="display:flex;border-bottom:2px solid #e8d9b8;margin-bottom:22px">
+  ${['overview','assessments','charts','videos'].map(tab => `
+    <button style="padding:9px 18px;font-size:0.84rem;font-weight:${_profileTab===tab?'700':'600'};color:${_profileTab===tab?'#005778':'#808285'};cursor:pointer;border:none;background:${_profileTab===tab?'#e0eef5':'transparent'};border-bottom:2px solid ${_profileTab===tab?'#005778':'transparent'};margin-bottom:-2px;border-radius:${_profileTab===tab?'8px 8px 0 0':'0'}" onclick="_profileTab='${tab}';renderStudentProfile('${sid}')">${{overview:'Overview',assessments:`Assessments (${ass.length})`,charts:'Charts',videos:'Videos'}[tab]}</button>`).join('')}
+</div>
+<div id="profileContent"></div>`;
+
+  if (_profileTab === 'overview')         renderProfileOverview(sid, s, ass, lastA, prov);
+  else if (_profileTab === 'assessments') renderProfileAssessments(sid, ass);
+  else if (_profileTab === 'charts')      renderProfileCharts(sid, ass);
+  else if (_profileTab === 'videos')      renderStudentVideos12(sid, s);
+};
+
+// ── STUDENTS LIST — show class + division + provider ─────────
+const _origRenderStudents3 = renderStudents;
+renderStudents = function() {
+  const f = STUDENTS.filter(s => {
+    const n = sName(s).toLowerCase();
+    return (!_ss || n.includes(_ss.toLowerCase())) &&
+           (!_sp || s.classId === _sp || s.providerId === _sp) &&
+           (!_st || getStudentTrend(s.id) === _st);
+  });
+
+  $('pageContent').innerHTML = `
+<div class="page-header">
+  <div><h1 class="page-title">Students</h1><p class="page-subtitle">${STUDENTS.length} students — Ichud Boys Program</p></div>
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-outline btn-sm" onclick="openCSVImport()">📄 CSV</button>
+    <button class="btn btn-primary" onclick="openAddStudentModal()">+ Add Student</button>
+  </div>
+</div>
+<div class="filter-bar">
+  <div class="search-bar"><svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" placeholder="Search student..." value="${_ss}" oninput="_ss=this.value;renderStudents()"></div>
+  <select class="form-control" style="width:auto" onchange="_sp=this.value;renderStudents()">
+    <option value="">All Classes</option>
+    ${PROGRAMS.map(div => `<optgroup label="${div.name}">${getDivisionClasses(div.id).map(c=>`<option value="${c.id}" ${_sp===c.id?'selected':''}>${c.name}</option>`).join('')}</optgroup>`).join('')}
+  </select>
+  <select class="form-control" style="width:auto" onchange="_st=this.value;renderStudents()">
+    <option value="">All Trends</option>
+    <option value="up" ${_st==='up'?'selected':''}>↑ Improving</option>
+    <option value="down" ${_st==='down'?'selected':''}>↓ Declining</option>
+    <option value="flat" ${_st==='flat'?'selected':''}>→ Stable</option>
+  </select>
+  <span class="badge badge-blue">${f.length} students</span>
+</div>
+<div class="card"><div class="table-wrapper"><table>
+  <thead><tr><th>#</th><th>Student</th><th>Class</th><th>Division</th><th>Provider</th><th>Trend</th><th>Assessments</th><th>Actions</th></tr></thead>
+  <tbody>${f.length===0?`<tr><td colspan="8" style="text-align:center;padding:40px;color:#808285">No students found</td></tr>`:f.map((s,i)=>{
+    const t=getStudentTrend(s.id),ass=getStudentAssessments(s.id),lastA=ass[ass.length-1];
+    const cls=getClass(s.classId),div=getClassDivision(s.classId),prov=getStudentProvider(s.id);
+    return`<tr class="clickable" onclick="navigate('student_profile',{studentId:'${s.id}'})">
+      <td style="color:#808285">${i+1}</td>
+      <td class="primary"><div style="display:flex;align-items:center;gap:10px"><div class="user-avatar" style="width:32px;height:32px;font-size:0.72rem;background:${avatarColor(i)}">${initials(sName(s))}</div><div><div class="he" style="font-weight:700">${sName(s)}</div><div class="he" style="font-size:0.72rem;color:#808285">${s.year}</div></div></div></td>
+      <td style="font-weight:600;color:#005778">${cls?cls.name:'—'}</td>
+      <td><span style="background:#e0eef5;color:#005778;padding:2px 8px;border-radius:20px;font-size:0.72rem;font-weight:700">${div?div.name:'—'}</span></td>
+      <td style="font-size:0.82rem;color:#808285">${prov?prov.name:'—'}</td>
+      <td>${trendBadge(t)}</td>
+      <td><span class="badge badge-neutral">${ass.length}</span></td>
+      <td onclick="event.stopPropagation()"><div style="display:flex;gap:6px"><button class="btn btn-outline btn-sm" onclick="navigate('student_profile',{studentId:'${s.id}'})">Profile</button><button class="btn btn-ghost btn-sm" onclick="openAddAssessmentModal('${s.id}')">+ Assess</button></div></td>
+    </tr>`;}).join('')}</tbody>
+</table></div></div>`;
+};
+
+// ── ADD STUDENT MODAL — class + provider selectors ───────────
+openAddStudentModal = function() {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,61,86,0.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px;box-shadow:0 24px 56px rgba(0,87,120,0.18);width:100%;max-width:560px;max-height:90vh;overflow-y:auto">
+      <div style="background:linear-gradient(135deg,#003d56,#005778);padding:18px 24px;border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:1rem;font-weight:800;color:#fff">Add New Student</span>
+        <button onclick="this.closest('[style*=fixed]').remove()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;color:#fff;cursor:pointer;font-size:0.9rem">✕</button>
+      </div>
+      <div style="padding:24px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+          <div class="form-group"><label class="form-label">First Name *</label><input type="text" class="form-control he" id="ns_first" placeholder="שם פרטי"></div>
+          <div class="form-group"><label class="form-label">Last Name *</label><input type="text" class="form-control he" id="ns_last" placeholder="שם משפחה"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+          <div class="form-group"><label class="form-label">Class *</label>
+            <select class="form-control" id="ns_class">
+              <option value="">Select class...</option>
+              ${PROGRAMS.map(div => `<optgroup label="${div.name}">${getDivisionClasses(div.id).map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</optgroup>`).join('')}
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Provider (1:1 Teacher)</label>
+            <select class="form-control" id="ns_prov">
+              <option value="">Select provider...</option>
+              ${PROVIDERS.map(p=>`<option value="${p.id}">${p.name}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="form-group"><label class="form-label">School Year</label>
+          <select class="form-control he" id="ns_year">${yearSelect(CUR_YEAR)}</select>
+        </div>
+        <div class="form-group"><label class="form-label">Notes</label><input type="text" class="form-control" id="ns_notes" placeholder="Optional notes"></div>
+      </div>
+      <div style="padding:14px 24px;border-top:1px solid #e8d9b8;display:flex;gap:10px;background:#fdf8f0;border-radius:0 0 16px 16px">
+        <button class="btn btn-primary" onclick="saveNewStudentNew(this.closest('[style*=fixed]'))">Save Student</button>
+        <button class="btn btn-ghost" onclick="this.closest('[style*=fixed]').remove()">Cancel</button>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+};
+
+function saveNewStudentNew(overlay) {
+  const fn = document.getElementById('ns_first')?.value.trim();
+  const ln = document.getElementById('ns_last')?.value.trim();
+  const classId = document.getElementById('ns_class')?.value;
+  const provId = document.getElementById('ns_prov')?.value;
+  const year = document.getElementById('ns_year')?.value || CUR_YEAR;
+  const notes = document.getElementById('ns_notes')?.value.trim() || '';
+  if (!fn || !ln || !classId) { showToast('First name, last name and class are required', 'warning'); return; }
+  const s = { id: genId('s'), firstName: fn, lastName: ln, classId, providerId: provId || '', year, status: 'active', notes };
+  STUDENTS.push(s);
+  if (provId) { const p = PROVIDERS.find(x => x.id === provId); if (p && !p.studentIds.includes(s.id)) p.studentIds.push(s.id); }
+  AUDIT_LOG.unshift({ id: genId('a'), action: 'Add Student', entity: 'Student', entityName: `${fn} ${ln}`, field: '—', before: '—', after: 'Created', timestamp: new Date().toISOString() });
+  SYS_LOGS.unshift({ id: genId('l'), type: 'info', message: `Student added: ${fn} ${ln}`, timestamp: new Date().toISOString() });
+  overlay?.remove();
+  showToast(`${fn} ${ln} added`, 'success');
+  const sb = $('studentsBadge'); if (sb) sb.textContent = STUDENTS.length;
+  if (_page === 'students') renderStudents();
+}
+
+// ── PROVIDER PROFILE — show caseload ────────────────────────
+renderProviderProfile = function(pid) {
+  // pid could be a class id or provider id
+  const cls = getClass(pid);
+  if (cls) {
+    // Show class profile
+    const div = getClassDivision(pid);
+    const students = getClassStudents(pid);
+    const hs = $('headerSubBreadcrumb'); if (hs) hs.innerHTML = ` › ${cls.name}`;
+    $('pageContent').innerHTML = `
+<div style="margin-bottom:14px"><button class="btn btn-ghost btn-sm" onclick="navigate('providers')">← Back</button></div>
+<div class="student-profile-header">
+  <div style="display:flex;align-items:center;gap:18px">
+    <div class="user-avatar" style="width:64px;height:64px;font-size:1.4rem">${cls.name.slice(0,2)}</div>
+    <div style="flex:1">
+      <div style="font-size:1.5rem;font-weight:900;color:#fff">${cls.name}</div>
+      <div style="font-size:0.95rem;color:rgba(255,255,255,0.8);margin-top:3px">${cls.grade}</div>
+      <div style="margin-top:8px">${div?`<span style="background:rgba(217,164,78,0.3);color:#D9A44E;font-size:0.75rem;font-weight:800;padding:3px 10px;border-radius:20px;border:1px solid rgba(217,164,78,0.4)">${div.name} Division</span>`:''}</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-gold btn-sm" onclick="navigate('worksheets')">Worksheet</button>
+      <button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3)" onclick="navigate('reports')">Reports</button>
+    </div>
+  </div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px">
+  <div class="kpi-card"><div class="kpi-value">${students.length}</div><div class="kpi-label">Students</div></div>
+  <div class="kpi-card success"><div class="kpi-value">${students.filter(s=>getStudentTrend(s.id)==='up').length}</div><div class="kpi-label">Improving</div></div>
+  <div class="kpi-card danger"><div class="kpi-value">${students.filter(s=>getStudentTrend(s.id)==='down').length}</div><div class="kpi-label">At Risk</div></div>
+  <div class="kpi-card gold"><div class="kpi-value">${ASSESSMENTS.filter(a=>students.some(s=>s.id===a.studentId)).length}</div><div class="kpi-label">Assessments</div></div>
+</div>
+<div class="card"><div class="card-header"><span class="card-title">Students in ${cls.name} (${students.length})</span><button class="btn btn-primary btn-sm" onclick="openAddStudentModal()">+ Add Student</button></div>
+<div class="table-wrapper"><table><thead><tr><th>Student</th><th>Provider</th><th>Trend</th><th>Assessments</th><th>Last Month</th><th>Actions</th></tr></thead><tbody>
+${students.map((s,i)=>{const t=getStudentTrend(s.id),a=getStudentAssessments(s.id),lastA=a[a.length-1],prov=getStudentProvider(s.id);return`<tr class="clickable" onclick="navigate('student_profile',{studentId:'${s.id}'})"><td class="primary"><div style="display:flex;align-items:center;gap:8px"><div class="user-avatar" style="width:28px;height:28px;font-size:0.65rem;background:${avatarColor(i)}">${initials(sName(s))}</div><span class="he">${sName(s)}</span></div></td><td style="font-size:0.82rem;color:#808285">${prov?prov.name:'—'}</td><td>${trendBadge(t)}</td><td><span class="badge badge-neutral">${a.length}</span></td><td>${lastA?`<span class="he" style="background:#005778;color:#fff;padding:2px 8px;border-radius:20px;font-size:0.7rem;font-weight:700">${getMonthLabel(lastA.month)} ${lastA.year}</span>`:'—'}</td><td onclick="event.stopPropagation()"><button class="btn btn-outline btn-sm" onclick="navigate('student_profile',{studentId:'${s.id}'})">Profile</button></td></tr>`;}).join('')}
+</tbody></table></div></div>`;
+  } else {
+    // Show provider caseload
+    const prov = PROVIDERS.find(p => p.id === pid);
+    if (!prov) { $('pageContent').innerHTML = '<div style="padding:40px">Not found</div>'; return; }
+    const students = getProviderStudentsNew(pid);
+    const hs = $('headerSubBreadcrumb'); if (hs) hs.textContent = ` › ${prov.name}`;
+    $('pageContent').innerHTML = `
+<div style="margin-bottom:14px"><button class="btn btn-ghost btn-sm" onclick="navigate('providers')">← Back</button></div>
+<div class="student-profile-header">
+  <div style="display:flex;align-items:center;gap:18px">
+    <div class="user-avatar" style="width:64px;height:64px;font-size:1.4rem">${initials(prov.name)}</div>
+    <div style="flex:1"><div style="font-size:1.5rem;font-weight:900;color:#fff">${prov.name}</div><div style="font-size:0.85rem;color:rgba(255,255,255,0.75);margin-top:4px">${prov.email}</div><div style="font-size:0.8rem;color:rgba(255,255,255,0.6);margin-top:4px">Provider — ${students.length} students in caseload</div></div>
+    <button class="btn btn-gold btn-sm" onclick="editProviderCaseload('${pid}')">Edit Caseload</button>
+  </div>
+</div>
+<div class="card"><div class="card-header"><span class="card-title">Caseload (${students.length} students)</span></div>
+<div class="table-wrapper"><table><thead><tr><th>Student</th><th>Class</th><th>Division</th><th>Trend</th><th>Assessments</th><th>Actions</th></tr></thead><tbody>
+${students.map((s,i)=>{const t=getStudentTrend(s.id),a=getStudentAssessments(s.id),cls=getClass(s.classId),div=getClassDivision(s.classId);return`<tr class="clickable" onclick="navigate('student_profile',{studentId:'${s.id}'})"><td class="primary"><div style="display:flex;align-items:center;gap:8px"><div class="user-avatar" style="width:28px;height:28px;font-size:0.65rem;background:${avatarColor(i)}">${initials(sName(s))}</div><span class="he">${sName(s)}</span></div></td><td style="font-weight:600;color:#005778">${cls?cls.name:'—'}</td><td><span style="background:#e0eef5;color:#005778;padding:2px 8px;border-radius:20px;font-size:0.72rem;font-weight:700">${div?div.name:'—'}</span></td><td>${trendBadge(t)}</td><td><span class="badge badge-neutral">${a.length}</span></td><td onclick="event.stopPropagation()"><button class="btn btn-outline btn-sm" onclick="navigate('student_profile',{studentId:'${s.id}'})">Profile</button></td></tr>`;}).join('')}
+</tbody></table></div></div>`;
+  }
+};
+
+// ── ANALYTICS — use new model ────────────────────────────────
+const _origRenderAnalytics3 = renderAnalytics;
+renderAnalytics = function() {
+  const imp = STUDENTS.filter(s => getStudentTrend(s.id) === 'up');
+  const str = STUDENTS.filter(s => getStudentTrend(s.id) === 'down');
+  $('pageContent').innerHTML = `
+<div class="page-header"><div><h1 class="page-title">Analytics</h1><p class="page-subtitle">Ichud Boys Program — Growth, regression, division comparison</p></div></div>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px">
+  <div class="kpi-card success"><div class="kpi-value">${imp.length}</div><div class="kpi-label">Improving</div></div>
+  <div class="kpi-card danger"><div class="kpi-value">${str.length}</div><div class="kpi-label">At Risk</div></div>
+  <div class="kpi-card"><div class="kpi-value">${ASSESSMENTS.length}</div><div class="kpi-label">Total Assessments</div></div>
+  <div class="kpi-card gold"><div class="kpi-value">${HEB_MONTHS.filter(m=>ASSESSMENTS.some(a=>a.month===m.id)).length}</div><div class="kpi-label">Active Months</div></div>
+</div>
+<div class="grid-2 mb-6">
+  <div class="card"><div class="card-header"><span class="card-title">Most Improved</span></div><div class="card-body" style="padding:0"><table><thead><tr><th>Student</th><th>Class</th><th>Division</th><th>#</th></tr></thead><tbody>${imp.slice(0,6).map((s,i)=>{const cls=getClass(s.classId),div=getClassDivision(s.classId);return`<tr class="clickable" onclick="navigate('student_profile',{studentId:'${s.id}'})"><td class="primary"><div style="display:flex;align-items:center;gap:8px"><div class="user-avatar" style="width:26px;height:26px;font-size:0.62rem;background:${avatarColor(i)}">${initials(sName(s))}</div><span class="he">${sName(s)}</span></div></td><td style="font-size:0.8rem">${cls?cls.name:'—'}</td><td style="font-size:0.8rem;color:#005778;font-weight:600">${div?div.name:'—'}</td><td><span class="badge badge-blue">${getStudentAssessments(s.id).length}</span></td></tr>`;}).join('')}${imp.length===0?'<tr><td colspan="4" style="text-align:center;padding:20px;color:#808285">No data</td></tr>':''}</tbody></table></div></div>
+  <div class="card"><div class="card-header"><span class="card-title">At-Risk Students</span></div><div class="card-body" style="padding:0"><table><thead><tr><th>Student</th><th>Class</th><th>Division</th><th>Action</th></tr></thead><tbody>${str.slice(0,6).map((s,i)=>{const cls=getClass(s.classId),div=getClassDivision(s.classId);return`<tr class="clickable" style="background:#fdecea" onclick="navigate('student_profile',{studentId:'${s.id}'})"><td class="primary"><div style="display:flex;align-items:center;gap:8px"><div class="user-avatar" style="width:26px;height:26px;font-size:0.62rem;background:${avatarColor(i)}">${initials(sName(s))}</div><span class="he">${sName(s)}</span></div></td><td style="font-size:0.8rem">${cls?cls.name:'—'}</td><td style="font-size:0.8rem;color:#005778;font-weight:600">${div?div.name:'—'}</td><td onclick="event.stopPropagation()"><button class="btn btn-outline btn-sm" onclick="navigate('student_profile',{studentId:'${s.id}'})">Review</button></td></tr>`;}).join('')}${str.length===0?'<tr><td colspan="4" style="text-align:center;padding:20px;color:#808285">No at-risk students</td></tr>':''}</tbody></table></div></div>
+</div>
+<div class="grid-2 mb-6">
+  <div class="card"><div class="card-header"><span class="card-title">Trend Distribution</span></div><div class="card-body"><div style="position:relative;height:220px"><canvas id="tChart"></canvas></div></div></div>
+  <div class="card"><div class="card-header"><span class="card-title">YTD Trend</span></div><div class="card-body"><div style="position:relative;height:220px"><canvas id="yChart"></canvas></div></div></div>
+</div>
+<div class="card mb-6">
+  <div class="card-header"><span class="card-title">Division Breakdown</span></div>
+  <div class="table-wrapper"><table><thead><tr><th>Division</th><th>Classes</th><th>Students</th><th>Improving</th><th>At Risk</th>${CATS.map(c=>`<th class="he">${c.label}</th>`).join('')}</tr></thead><tbody>
+    ${PROGRAMS.map(div=>{const ss=getDivisionStudents(div.id),ass=ASSESSMENTS.filter(a=>ss.some(s=>s.id===a.studentId)),im=ss.filter(s=>getStudentTrend(s.id)==='up').length,st=ss.filter(s=>getStudentTrend(s.id)==='down').length;return`<tr><td class="primary" style="font-weight:800;color:#005778">${div.name}</td><td><span class="badge badge-blue">${getDivisionClasses(div.id).length}</span></td><td><span class="badge badge-neutral">${ss.length}</span></td><td><span class="badge badge-success">${im}</span></td><td><span class="badge badge-danger">${st}</span></td>${CATS.map(cat=>{const v=ass.length?Math.round(ass.reduce((s,a)=>s+(a.categories[cat.id]?.correct||0),0)/ass.length*10)/10:0;return`<td style="font-weight:700;color:${cat.color}">${v}</td>`;}).join('')}</tr>`;}).join('')}
+  </tbody></table></div>
+</div>
+<div class="card">
+  <div class="card-header"><span class="card-title">Provider Caseload Performance</span></div>
+  <div class="table-wrapper"><table><thead><tr><th>Provider</th><th>Students</th><th>Improving</th><th>At Risk</th>${CATS.map(c=>`<th class="he">${c.label}</th>`).join('')}</tr></thead><tbody>
+    ${PROVIDERS.map(prov=>{const ss=getProviderStudentsNew(prov.id),ass=ASSESSMENTS.filter(a=>ss.some(s=>s.id===a.studentId)),im=ss.filter(s=>getStudentTrend(s.id)==='up').length,st=ss.filter(s=>getStudentTrend(s.id)==='down').length;return`<tr><td class="primary">${prov.name}</td><td><span class="badge badge-neutral">${ss.length}</span></td><td><span class="badge badge-success">${im}</span></td><td><span class="badge badge-danger">${st}</span></td>${CATS.map(cat=>{const v=ass.length?Math.round(ass.reduce((s,a)=>s+(a.categories[cat.id]?.correct||0),0)/ass.length*10)/10:0;return`<td style="font-weight:700;color:${cat.color}">${v}</td>`;}).join('')}</tr>`;}).join('')}
+  </tbody></table></div>
+</div>`;
+  setTimeout(()=>{const up=imp.length,down=str.length,flat=STUDENTS.length-up-down;const c1=$('tChart');if(c1)_charts.t=new Chart(c1,{type:'doughnut',data:{labels:['Improving','Stable','At Risk'],datasets:[{data:[up,flat,down],backgroundColor:['#1a6038','#808285','#9a1c1c'],borderWidth:2,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:11},padding:10}}}}});const c2=$('yChart');if(c2){const months=HEB_MONTHS.slice(0,9);_charts.y=new Chart(c2,{type:'line',data:{labels:months.map(m=>m.label),datasets:CATS.map(cat=>({label:cat.label,data:months.map(m=>{const ass=ASSESSMENTS.filter(a=>a.month===m.id);return ass.length?Math.round(ass.reduce((s,a)=>s+(a.categories[cat.id]?.correct||0),0)/ass.length*10)/10:null;}),borderColor:cat.color,backgroundColor:cat.color+'15',tension:0.4,fill:true,pointRadius:3}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10},padding:8}}},scales:{x:{grid:{color:'#f5f5f5'}},y:{beginAtZero:true,grid:{color:'#f5f5f5'}}}}});}},80);
+};
+
+// ── BACKUP — include new model ───────────────────────────────
+downloadBackup = function() {
+  const data = {
+    exportedAt: new Date().toISOString(), version: '3.0',
+    school: SCHOOL, kriahDirector: KRIAH_DIRECTOR,
+    programs: PROGRAMS, classes: CLASSES, providers: PROVIDERS,
+    students: STUDENTS, assessments: ASSESSMENTS,
+    reportFinals: REPORT_FINALS, ocrImports: OCR_IMPORTS,
+    systemLog: SYS_LOGS.slice(0,100),
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `KriahTrack_IchudBoys_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  showToast('Backup downloaded', 'success');
 };
