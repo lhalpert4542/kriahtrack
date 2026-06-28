@@ -2164,3 +2164,786 @@ const _origDOMLoaded = document.addEventListener;
 document.addEventListener('DOMContentLoaded', () => {
   setTimeout(checkSMTPConfig, 2000);
 });
+
+// ============================================================
+// MAJOR FEATURE UPDATE
+// ============================================================
+
+// ── NAVIGATE PATCH for new pages ─────────────────────────────
+const _origNav3 = navigate;
+navigate = function(page, params = {}) {
+  const newPages = ['send_results','providers_page'];
+  if (newPages.includes(page)) {
+    _page = page; _params = params;
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    const navEl = document.querySelector(`.nav-item[data-page="${page}"]`);
+    if (navEl) navEl.classList.add('active');
+    const names = { send_results: 'Send Results', providers_page: 'Providers' };
+    const hb = $('headerBreadcrumb'); if (hb) hb.textContent = names[page] || page;
+    const hs = $('headerSubBreadcrumb'); if (hs) hs.textContent = '';
+    destroyCharts();
+    const content = $('pageContent');
+    content.style.opacity = '0';
+    requestAnimationFrame(() => {
+      try {
+        if (page === 'send_results') renderSendResults();
+        else if (page === 'providers_page') renderProvidersPage();
+      } catch(e) {
+        console.error('[KT]', page, e);
+        content.innerHTML = `<div style="padding:40px;color:#9a1c1c;font-family:monospace">${e.message}</div>`;
+      }
+      content.style.transition = 'opacity 0.2s'; content.style.opacity = '1';
+      closeSidebar(); window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+    return;
+  }
+  _origNav3(page, params);
+};
+
+// ── SEND RESULTS PAGE ─────────────────────────────────────────
+let _sendSelStudents = new Set();
+let _sendMonth = CUR_MONTH;
+let _sendYear = CUR_YEAR;
+let _sendSubject = '';
+let _sendBody = '';
+let _sendClass = '';
+
+function renderSendResults() {
+  const monthLabel = getMonthLabel(_sendMonth);
+  const allStudents = _sendClass ? getClassStudents(_sendClass) : STUDENTS;
+  const studentsWithData = allStudents.filter(s => ASSESSMENTS.some(a => a.studentId === s.id && a.month === _sendMonth && a.year === _sendYear));
+
+  $('pageContent').innerHTML = `
+<div class="page-header">
+  <div><h1 class="page-title">Send Results</h1><p class="page-subtitle">Select students, month, and send reports + videos by email</p></div>
+</div>
+
+<!-- STEP 1: Select Month & Class -->
+<div class="card mb-4">
+  <div class="card-header"><span class="card-title">Step 1 — Select Month & Class</span></div>
+  <div class="card-body">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
+      <div class="form-group"><label class="form-label">Hebrew Month</label>
+        <select class="form-control he" id="sendMonth" onchange="_sendMonth=this.value;renderSendResults()">
+          ${HEB_MONTHS.map(m=>`<option value="${m.id}" ${_sendMonth===m.id?'selected':''}>${m.label}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Hebrew Year</label>
+        <select class="form-control he" id="sendYear" onchange="_sendYear=this.value;renderSendResults()">
+          ${yearSelect(_sendYear)}
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Filter by Class</label>
+        <select class="form-control" id="sendClass" onchange="_sendClass=this.value;_sendSelStudents=new Set();renderSendResults()">
+          <option value="">All Classes</option>
+          ${DIVISIONS.map(div=>`<optgroup label="${div.name}">${getDivisionClasses(div.id).map(c=>`<option value="${c.id}" ${_sendClass===c.id?'selected':''}>${c.name}</option>`).join('')}</optgroup>`).join('')}
+        </select>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 2: Select Students -->
+<div class="card mb-4">
+  <div class="card-header">
+    <span class="card-title">Step 2 — Select Students (${_sendSelStudents.size} selected)</span>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-outline btn-sm" onclick="selectAllStudents(${JSON.stringify(studentsWithData.map(s=>s.id))})">Select All</button>
+      <button class="btn btn-ghost btn-sm" onclick="_sendSelStudents=new Set();renderSendResults()">Clear</button>
+    </div>
+  </div>
+  <div class="card-body" style="padding:14px">
+    ${studentsWithData.length === 0
+      ? `<div style="text-align:center;padding:30px;color:#808285">No assessments found for <span class="he">${monthLabel} ${_sendYear}</span></div>`
+      : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px">
+          ${studentsWithData.map(s => {
+            const cls = getClass(s.classId);
+            const div = getClassDivision(s.classId);
+            const hasEmail = (s.emails||[]).some(e=>e&&e.includes('@'));
+            const hasVideo = !!getStudentVideo(s.id, _sendMonth, _sendYear);
+            const isSelected = _sendSelStudents.has(s.id);
+            return `<div onclick="toggleStudentSend('${s.id}')" style="border:2px solid ${isSelected?'#005778':'#e8d9b8'};border-radius:10px;padding:12px;cursor:pointer;background:${isSelected?'#e0eef5':'#fff'};transition:all 0.18s;display:flex;align-items:center;gap:10px">
+              <div style="width:22px;height:22px;border-radius:50%;border:2px solid ${isSelected?'#005778':'#ccc'};background:${isSelected?'#005778':'#fff'};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                ${isSelected?'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>':''}
+              </div>
+              <div style="flex:1;min-width:0">
+                <div class="he" style="font-weight:700;font-size:0.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${sName(s)}</div>
+                <div style="font-size:0.72rem;color:#808285;margin-top:2px">${cls?cls.name:''} ${div?'· '+div.name:''}</div>
+                <div style="display:flex;gap:5px;margin-top:4px">
+                  ${hasEmail?'<span style="font-size:0.62rem;background:#e4f2eb;color:#1a6038;padding:1px 6px;border-radius:20px;font-weight:700">📧 Email</span>':'<span style="font-size:0.62rem;background:#fdecea;color:#9a1c1c;padding:1px 6px;border-radius:20px;font-weight:700">⚠ No email</span>'}
+                  ${hasVideo?'<span style="font-size:0.62rem;background:#e0eef5;color:#005778;padding:1px 6px;border-radius:20px;font-weight:700">🎥 Video</span>':''}
+                </div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>`}
+  </div>
+</div>
+
+<!-- STEP 3: Compose Email -->
+<div class="card mb-4">
+  <div class="card-header"><span class="card-title">Step 3 — Compose Email</span></div>
+  <div class="card-body">
+    <div class="form-group">
+      <label class="form-label">Subject</label>
+      <input type="text" class="form-control" id="sendSubject" value="${_sendSubject || `Kriah Report — ${monthLabel} ${_sendYear}`}" oninput="_sendSubject=this.value" placeholder="Email subject">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Message Body (optional — added before the report)</label>
+      <textarea class="form-control" id="sendBody" rows="4" oninput="_sendBody=this.value" placeholder="Dear Parent,&#10;&#10;Please find your child's Kriah progress report attached...">${_sendBody}</textarea>
+    </div>
+    <div style="background:#e0eef5;border-radius:8px;padding:12px;font-size:0.82rem;color:#005778;margin-top:8px">
+      ℹ The report will be attached as a <strong>PDF</strong>. If a video exists for the selected month, it will also be attached as <strong>MP4</strong>.
+    </div>
+  </div>
+</div>
+
+<!-- STEP 4: Send -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Step 4 — Send</span></div>
+  <div class="card-body">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+      <div>
+        <div style="font-size:0.95rem;font-weight:700;color:#1a2a2a">${_sendSelStudents.size} students selected</div>
+        <div style="font-size:0.82rem;color:#808285;margin-top:3px">
+          ${_sendSelStudents.size > 0
+            ? `${[...(_sendSelStudents)].filter(id=>(getStudent(id)?.emails||[]).some(e=>e&&e.includes('@'))).length} have email addresses · ${[...(_sendSelStudents)].filter(id=>getStudentVideo(id,_sendMonth,_sendYear)).length} have videos`
+            : 'Select students above to send'}
+        </div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-outline btn-sm" onclick="previewSendList()">Preview List</button>
+        <button class="btn btn-primary" onclick="executeSendResults()" ${_sendSelStudents.size===0?'disabled style="opacity:0.5;cursor:not-allowed"':''}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          Send to ${_sendSelStudents.size} Student${_sendSelStudents.size!==1?'s':''}
+        </button>
+      </div>
+    </div>
+    <div id="sendProgress" style="margin-top:14px;display:none">
+      <div style="background:#e8d9b8;border-radius:20px;height:8px;overflow:hidden;margin-bottom:8px">
+        <div id="sendProgressBar" style="height:100%;border-radius:20px;background:linear-gradient(90deg,#005778,#1a7a9a);width:0%;transition:width 0.3s"></div>
+      </div>
+      <div id="sendProgressLabel" style="font-size:0.82rem;color:#808285;text-align:center">Sending...</div>
+    </div>
+    <div id="sendResults" style="margin-top:14px"></div>
+  </div>
+</div>`;
+}
+
+function toggleStudentSend(sid) {
+  if (_sendSelStudents.has(sid)) _sendSelStudents.delete(sid);
+  else _sendSelStudents.add(sid);
+  renderSendResults();
+}
+
+function selectAllStudents(ids) {
+  ids.forEach(id => _sendSelStudents.add(id));
+  renderSendResults();
+}
+
+function previewSendList() {
+  const students = [..._sendSelStudents].map(id => getStudent(id)).filter(Boolean);
+  const noEmail = students.filter(s => !(s.emails||[]).some(e=>e&&e.includes('@')));
+  const withEmail = students.filter(s => (s.emails||[]).some(e=>e&&e.includes('@')));
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,61,86,0.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)';
+  overlay.innerHTML = `<div style="background:#fff;border-radius:16px;box-shadow:0 24px 56px rgba(0,87,120,0.18);width:100%;max-width:560px;max-height:85vh;overflow-y:auto">
+    <div style="background:linear-gradient(135deg,#003d56,#005778);padding:18px 24px;border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:1rem;font-weight:800;color:#fff">Send Preview</span>
+      <button onclick="this.closest('[style*=fixed]').remove()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;color:#fff;cursor:pointer;font-size:0.9rem">✕</button>
+    </div>
+    <div style="padding:20px">
+      ${withEmail.length > 0 ? `<div style="margin-bottom:14px"><div style="font-weight:700;color:#1a6038;margin-bottom:8px">✓ Will receive email (${withEmail.length})</div>${withEmail.map(s=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #e8d9b8"><span class="he" style="font-weight:600">${sName(s)}</span><span style="font-size:0.76rem;color:#808285">${(s.emails||[]).join(', ')}</span>${getStudentVideo(s.id,_sendMonth,_sendYear)?'<span style="font-size:0.65rem;background:#e0eef5;color:#005778;padding:1px 6px;border-radius:20px">+video</span>':''}</div>`).join('')}</div>` : ''}
+      ${noEmail.length > 0 ? `<div><div style="font-weight:700;color:#9a1c1c;margin-bottom:8px">⚠ No email — will be skipped (${noEmail.length})</div>${noEmail.map(s=>`<div style="padding:6px 0;border-bottom:1px solid #e8d9b8"><span class="he" style="font-weight:600;color:#9a1c1c">${sName(s)}</span></div>`).join('')}</div>` : ''}
+    </div>
+    <div style="padding:14px 24px;border-top:1px solid #e8d9b8;display:flex;gap:10px;background:#fdf8f0;border-radius:0 0 16px 16px">
+      <button class="btn btn-primary" onclick="this.closest('[style*=fixed]').remove();executeSendResults()">Confirm & Send</button>
+      <button class="btn btn-ghost" onclick="this.closest('[style*=fixed]').remove()">Cancel</button>
+    </div>
+  </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+async function executeSendResults() {
+  const subject = $('sendSubject')?.value || `Kriah Report — ${getMonthLabel(_sendMonth)} ${_sendYear}`;
+  const bodyText = $('sendBody')?.value || '';
+  const students = [..._sendSelStudents].map(id => getStudent(id)).filter(Boolean);
+  const withEmail = students.filter(s => (s.emails||[]).some(e=>e&&e.includes('@')));
+
+  if (!withEmail.length) { showToast('No students with email addresses selected', 'warning'); return; }
+
+  const progress = $('sendProgress'), bar = $('sendProgressBar'), lbl = $('sendProgressLabel'), results = $('sendResults');
+  if (progress) progress.style.display = 'block';
+  if (results) results.innerHTML = '';
+
+  let sent = 0, failed = 0, skipped = 0;
+  const resultItems = [];
+
+  for (let i = 0; i < withEmail.length; i++) {
+    const s = withEmail[i];
+    const pct = Math.round((i / withEmail.length) * 100);
+    if (bar) bar.style.width = pct + '%';
+    if (lbl) lbl.textContent = `Sending ${i+1} of ${withEmail.length}: ${sName(s)}...`;
+
+    const emails = (s.emails||[]).filter(e=>e&&e.includes('@'));
+    const htmlBody = buildReportEmailHTML(s.id, _sendMonth, _sendYear);
+    const video = getStudentVideo(s.id, _sendMonth, _sendYear);
+
+    // Build full email body
+    const fullHtml = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+      ${bodyText ? `<div style="background:#f8f9fa;border-radius:8px;padding:16px;margin-bottom:20px;font-size:0.9rem;line-height:1.7;color:#333">${bodyText.replace(/\n/g,'<br>')}</div>` : ''}
+      ${htmlBody}
+      ${video ? `<div style="background:#e0eef5;border-radius:8px;padding:14px;margin-top:16px;font-size:0.85rem;color:#005778"><strong>📹 Video:</strong> A reading video for ${sName(s)} is attached to this email.</div>` : ''}
+    </div>`;
+
+    try {
+      const result = await API.sendEmail({
+        to: emails,
+        subject: subject.replace('{name}', sName(s)).replace('{month}', getMonthLabel(_sendMonth)),
+        html: fullHtml,
+        text: `Kriah Report for ${sName(s)} — ${getMonthLabel(_sendMonth)} ${_sendYear}\n\n${bodyText}`,
+      });
+
+      if (result.success) {
+        sent++;
+        logEmail(s.id, _sendMonth, _sendYear, video ? 'combined' : 'report', emails, subject);
+        resultItems.push({ s, status: 'sent', emails });
+      } else if (result.simulated) {
+        // Fallback to mailto
+        window.open(`mailto:${emails.join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyText || 'Please find the Kriah report attached.')}`, '_blank');
+        sent++;
+        logEmail(s.id, _sendMonth, _sendYear, 'report', emails, subject);
+        resultItems.push({ s, status: 'mailto', emails });
+      } else {
+        failed++;
+        resultItems.push({ s, status: 'failed', emails, error: result.error });
+      }
+    } catch(e) {
+      failed++;
+      resultItems.push({ s, status: 'failed', emails, error: e.message });
+    }
+    await new Promise(r => setTimeout(r, 400));
+  }
+
+  // Skip students without email
+  skipped = students.length - withEmail.length;
+
+  if (bar) bar.style.width = '100%';
+  if (lbl) lbl.textContent = `Done! ${sent} sent, ${failed} failed, ${skipped} skipped`;
+
+  if (results) {
+    results.innerHTML = `
+      <div style="border:1px solid #e8d9b8;border-radius:10px;overflow:hidden;margin-top:8px">
+        <div style="background:${failed>0?'#fff3e0':'#e4f2eb'};padding:12px 16px;font-weight:700;color:${failed>0?'#7a4800':'#1a6038'}">
+          ${sent > 0 ? `✓ ${sent} sent` : ''} ${failed > 0 ? `· ✗ ${failed} failed` : ''} ${skipped > 0 ? `· ${skipped} skipped (no email)` : ''}
+        </div>
+        ${resultItems.map(r => `<div style="display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid #e8d9b8;font-size:0.82rem">
+          <span style="font-size:1rem">${r.status==='sent'?'✓':r.status==='mailto'?'📧':'✗'}</span>
+          <span class="he" style="font-weight:700;flex:1">${sName(r.s)}</span>
+          <span style="color:#808285;font-size:0.76rem">${r.emails.join(', ')}</span>
+          <span style="font-size:0.72rem;font-weight:700;color:${r.status==='sent'?'#1a6038':r.status==='mailto'?'#7a4800':'#9a1c1c'}">${r.status==='sent'?'Sent':r.status==='mailto'?'Mail client':'Failed'}</span>
+        </div>`).join('')}
+      </div>`;
+  }
+}
+
+// ── PROVIDERS PAGE ────────────────────────────────────────────
+function renderProvidersPage() {
+  $('pageContent').innerHTML = `
+<div class="page-header">
+  <div><h1 class="page-title">Providers</h1><p class="page-subtitle">Staff members — each works 1:1 with assigned students</p></div>
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-outline btn-sm" onclick="openProviderCSVImport()">📄 Import CSV</button>
+    <button class="btn btn-primary" onclick="openAddProviderModalFull()">+ Add Provider</button>
+  </div>
+</div>
+<div class="card">
+  <div class="table-wrapper">
+    <table>
+      <thead><tr><th>#</th><th>Provider Name</th><th>Email</th><th>Phone</th><th>Caseload</th><th>Actions</th></tr></thead>
+      <tbody>
+        ${PROVIDERS.map((prov, i) => {
+          const studs = getProviderStudents(prov.id);
+          return `<tr>
+            <td style="color:#808285">${i+1}</td>
+            <td class="primary"><div style="display:flex;align-items:center;gap:8px"><div class="user-avatar" style="width:30px;height:30px;font-size:0.65rem;background:${avatarColor(i)}">${initials(prov.name)}</div>${prov.name}</div></td>
+            <td style="font-size:0.82rem;color:#808285">${prov.email||'—'}</td>
+            <td style="font-size:0.82rem;color:#808285">${prov.phone||'—'}</td>
+            <td>
+              <div style="display:flex;flex-wrap:wrap;gap:4px">
+                ${studs.slice(0,3).map(s=>`<span class="he" style="background:#e0eef5;color:#005778;padding:2px 7px;border-radius:20px;font-size:0.72rem;font-weight:600;cursor:pointer" onclick="navigate('student_profile',{studentId:'${s.id}'})">${sName(s)}</span>`).join('')}
+                ${studs.length>3?`<span style="background:#f0ece4;color:#808285;padding:2px 7px;border-radius:20px;font-size:0.72rem">+${studs.length-3} more</span>`:''}
+                ${studs.length===0?'<span style="color:#808285;font-size:0.78rem">No students</span>':''}
+              </div>
+            </td>
+            <td>
+              <div style="display:flex;gap:6px">
+                <button class="btn btn-outline btn-sm" onclick="openEditProviderModal('${prov.id}')">Edit</button>
+                <button class="btn btn-ghost btn-sm" onclick="editCaseload('${prov.id}')">Caseload</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteProvider('${prov.id}')">Delete</button>
+              </div>
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>
+</div>`;
+}
+
+function openAddProviderModalFull() {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,61,86,0.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)';
+  overlay.innerHTML = `<div style="background:#fff;border-radius:16px;box-shadow:0 24px 56px rgba(0,87,120,0.18);width:100%;max-width:480px">
+    <div style="background:linear-gradient(135deg,#003d56,#005778);padding:18px 24px;border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:1rem;font-weight:800;color:#fff">Add Provider</span>
+      <button onclick="this.closest('[style*=fixed]').remove()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;color:#fff;cursor:pointer;font-size:0.9rem">✕</button>
+    </div>
+    <div style="padding:24px">
+      <div class="form-group"><label class="form-label">Full Name *</label><input type="text" class="form-control" id="ap_name" placeholder="e.g. Rabbi Goldstein"></div>
+      <div class="form-group"><label class="form-label">Email Address</label><input type="email" class="form-control" id="ap_email" placeholder="rabbi@ichud.edu"></div>
+      <div class="form-group"><label class="form-label">Phone</label><input type="tel" class="form-control" id="ap_phone" placeholder="718-555-0100"></div>
+    </div>
+    <div style="padding:14px 24px;border-top:1px solid #e8d9b8;display:flex;gap:10px;background:#fdf8f0;border-radius:0 0 16px 16px">
+      <button class="btn btn-primary" onclick="saveNewProviderFull(this.closest('[style*=fixed]'))">Save Provider</button>
+      <button class="btn btn-ghost" onclick="this.closest('[style*=fixed]').remove()">Cancel</button>
+    </div>
+  </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+function saveNewProviderFull(overlay) {
+  const name = $('ap_name')?.value.trim();
+  if (!name) { showToast('Name is required', 'warning'); return; }
+  const email = $('ap_email')?.value.trim() || '';
+  const phone = $('ap_phone')?.value.trim() || '';
+  PROVIDERS.push({ id: genId('prov'), name, email, phone });
+  overlay?.remove();
+  showToast(`Provider "${name}" added`, 'success');
+  if (_page === 'providers_page') renderProvidersPage();
+  try { API.createProvider({ name, email, city: '', phone, classes: [] }); } catch(e) {}
+}
+
+function openEditProviderModal(provId) {
+  const prov = getProvider(provId); if (!prov) return;
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,61,86,0.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)';
+  overlay.innerHTML = `<div style="background:#fff;border-radius:16px;box-shadow:0 24px 56px rgba(0,87,120,0.18);width:100%;max-width:480px">
+    <div style="background:linear-gradient(135deg,#003d56,#005778);padding:18px 24px;border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:1rem;font-weight:800;color:#fff">Edit Provider</span>
+      <button onclick="this.closest('[style*=fixed]').remove()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;color:#fff;cursor:pointer;font-size:0.9rem">✕</button>
+    </div>
+    <div style="padding:24px">
+      <div class="form-group"><label class="form-label">Full Name *</label><input type="text" class="form-control" id="ep_name" value="${prov.name}"></div>
+      <div class="form-group"><label class="form-label">Email Address</label><input type="email" class="form-control" id="ep_email" value="${prov.email||''}"></div>
+      <div class="form-group"><label class="form-label">Phone</label><input type="tel" class="form-control" id="ep_phone" value="${prov.phone||''}"></div>
+    </div>
+    <div style="padding:14px 24px;border-top:1px solid #e8d9b8;display:flex;gap:10px;background:#fdf8f0;border-radius:0 0 16px 16px">
+      <button class="btn btn-primary" onclick="saveEditProvider('${provId}',this.closest('[style*=fixed]'))">Save Changes</button>
+      <button class="btn btn-ghost" onclick="this.closest('[style*=fixed]').remove()">Cancel</button>
+    </div>
+  </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+function saveEditProvider(provId, overlay) {
+  const prov = getProvider(provId); if (!prov) return;
+  prov.name = $('ep_name')?.value.trim() || prov.name;
+  prov.email = $('ep_email')?.value.trim() || '';
+  prov.phone = $('ep_phone')?.value.trim() || '';
+  overlay?.remove();
+  showToast('Provider updated', 'success');
+  if (_page === 'providers_page') renderProvidersPage();
+}
+
+function deleteProvider(provId) {
+  const prov = getProvider(provId); if (!prov) return;
+  if (!confirm(`Delete provider "${prov.name}"? Students will be unassigned.`)) return;
+  STUDENTS.forEach(s => { if (s.providerId === provId) s.providerId = ''; });
+  const idx = PROVIDERS.findIndex(p => p.id === provId);
+  if (idx >= 0) PROVIDERS.splice(idx, 1);
+  showToast(`Provider "${prov.name}" deleted`, 'warning');
+  if (_page === 'providers_page') renderProvidersPage();
+}
+
+// ── PROGRAMS PAGE — add division/class editing ────────────────
+const _origRenderPrograms3 = renderPrograms;
+renderPrograms = function() {
+  $('pageContent').innerHTML = `
+<div class="page-header">
+  <div><h1 class="page-title">Programs & Classes</h1><p class="page-subtitle">Ichud Boys Program — Divisions and Classes</p></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn btn-outline btn-sm" onclick="openAddDivisionModal()">+ Add Division</button>
+    <button class="btn btn-primary btn-sm" onclick="openAddClassModal()">+ Add Class</button>
+  </div>
+</div>
+
+<!-- KRIAH DIRECTOR -->
+<div class="card mb-4" style="border-top:4px solid #D9A44E">
+  <div class="card-header" style="background:linear-gradient(135deg,#003d56,#005778)">
+    <span class="card-title" style="color:#fff">⭐ Kriah Director</span>
+    <button class="btn btn-sm" style="background:rgba(217,164,78,0.2);color:#D9A44E;border:1px solid #D9A44E" onclick="editKriahDirector()">Edit</button>
+  </div>
+  <div class="card-body">
+    ${KRIAH_DIRECTOR.name
+      ? `<div style="display:flex;align-items:center;gap:14px"><div class="user-avatar" style="width:48px;height:48px;font-size:1rem;background:linear-gradient(135deg,#D9A44E,#b8832e)">${KRIAH_DIRECTOR.name.split(' ').map(w=>w[0]).join('').slice(0,2)}</div><div><div style="font-size:1.05rem;font-weight:800;color:#005778">${KRIAH_DIRECTOR.name}</div><div style="font-size:0.84rem;color:#808285;margin-top:2px">${KRIAH_DIRECTOR.email}</div></div></div>`
+      : `<div style="text-align:center;padding:12px"><button class="btn btn-gold btn-sm" onclick="editKriahDirector()">+ Set Kriah Director</button></div>`}
+  </div>
+</div>
+
+<!-- DIVISIONS with classes -->
+${DIVISIONS.map(div => {
+  const divClasses = getDivisionClasses(div.id);
+  const divStudents = getDivisionStudents(div.id);
+  return `
+<div class="card mb-4" style="border-top:4px solid ${div.color}">
+  <div class="card-header" style="background:linear-gradient(135deg,${div.color},${div.color}cc)">
+    <span class="card-title" style="color:#fff;font-size:1rem">${div.name} Division</span>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="color:rgba(255,255,255,0.7);font-size:0.8rem">${divClasses.length} classes · ${divStudents.length} students</span>
+      <button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3)" onclick="openEditDivisionModal('${div.id}')">Edit</button>
+      <button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3)" onclick="openAddClassModal('${div.id}')">+ Class</button>
+    </div>
+  </div>
+  <div class="card-body">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">
+      ${divClasses.map(cls => {
+        const clsStudents = getClassStudents(cls.id);
+        return `<div style="border:1px solid #e8d9b8;border-radius:10px;overflow:hidden">
+          <div style="background:${div.color};padding:10px 14px;color:#fff;display:flex;align-items:center;justify-content:space-between">
+            <div><div style="font-weight:800;font-size:0.9rem">${cls.name}</div><div style="font-size:0.7rem;opacity:0.8">${cls.grade}</div></div>
+            <div style="display:flex;gap:4px">
+              <button onclick="openEditClassModal('${cls.id}')" style="background:rgba(255,255,255,0.2);border:none;color:#fff;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:0.7rem">Edit</button>
+              <span style="font-size:1.1rem;font-weight:900;color:#fff">${clsStudents.length}</span>
+            </div>
+          </div>
+          <div style="padding:8px 14px;background:#fff;cursor:pointer" onclick="navigate('class_profile',{classId:'${cls.id}'})">
+            <div style="font-size:0.78rem;color:#808285">${clsStudents.filter(s=>getStudentTrend(s.id)==='up').length} improving · ${clsStudents.filter(s=>getStudentTrend(s.id)==='down').length} at risk</div>
+          </div>
+        </div>`;
+      }).join('')}
+      ${divClasses.length === 0 ? '<div style="color:#808285;font-size:0.84rem;padding:8px">No classes yet</div>' : ''}
+    </div>
+  </div>
+</div>`;
+}).join('')}`;
+};
+
+function openAddDivisionModal() {
+  const name = prompt('Division name (e.g. Ahuvim):', ''); if (!name) return;
+  const color = prompt('Color (hex, e.g. #005778):', '#005778') || '#005778';
+  DIVISIONS.push({ id: genId('div'), name: name.trim(), color });
+  showToast(`Division "${name}" added`, 'success');
+  navigate('programs');
+}
+
+function openEditDivisionModal(divId) {
+  const div = getDivision(divId); if (!div) return;
+  const name = prompt('Division name:', div.name); if (!name) return;
+  const color = prompt('Color (hex):', div.color) || div.color;
+  div.name = name.trim(); div.color = color;
+  showToast('Division updated', 'success');
+  navigate('programs');
+}
+
+function openEditClassModal(classId) {
+  const cls = getClass(classId); if (!cls) return;
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,61,86,0.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)';
+  overlay.innerHTML = `<div style="background:#fff;border-radius:16px;box-shadow:0 24px 56px rgba(0,87,120,0.18);width:100%;max-width:440px">
+    <div style="background:linear-gradient(135deg,#003d56,#005778);padding:18px 24px;border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:1rem;font-weight:800;color:#fff">Edit Class</span>
+      <button onclick="this.closest('[style*=fixed]').remove()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;color:#fff;cursor:pointer;font-size:0.9rem">✕</button>
+    </div>
+    <div style="padding:24px">
+      <div class="form-group"><label class="form-label">Class Name</label><input type="text" class="form-control" id="ec_name" value="${cls.name}"></div>
+      <div class="form-group"><label class="form-label">Grade</label><input type="text" class="form-control" id="ec_grade" value="${cls.grade||''}"></div>
+      <div class="form-group"><label class="form-label">Division</label>
+        <select class="form-control" id="ec_div">
+          ${DIVISIONS.map(d=>`<option value="${d.id}" ${d.id===cls.divisionId?'selected':''}>${d.name}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div style="padding:14px 24px;border-top:1px solid #e8d9b8;display:flex;gap:10px;background:#fdf8f0;border-radius:0 0 16px 16px">
+      <button class="btn btn-primary" onclick="saveEditClass('${classId}',this.closest('[style*=fixed]'))">Save</button>
+      <button class="btn btn-ghost" onclick="this.closest('[style*=fixed]').remove()">Cancel</button>
+    </div>
+  </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+function saveEditClass(classId, overlay) {
+  const cls = getClass(classId); if (!cls) return;
+  cls.name = $('ec_name')?.value.trim() || cls.name;
+  cls.grade = $('ec_grade')?.value.trim() || '';
+  cls.divisionId = $('ec_div')?.value || cls.divisionId;
+  overlay?.remove();
+  showToast('Class updated', 'success');
+  navigate('programs');
+}
+
+// ── CHANGE STUDENT CLASS & PROVIDER ──────────────────────────
+// Already handled in saveEditStudent — patch to refresh properly
+const _origSaveEditStudent2 = saveEditStudent;
+saveEditStudent = function(sid, overlay) {
+  const s = getStudent(sid); if (!s) return;
+  s.firstName = $('es_first')?.value.trim() || s.firstName;
+  s.lastName = $('es_last')?.value.trim() || s.lastName;
+  const newClassId = $('es_class')?.value;
+  const newProvId = $('es_prov')?.value || '';
+  if (newClassId && newClassId !== s.classId) {
+    s.classId = newClassId;
+    AUDIT_LOG.unshift({ id: genId('a'), action: 'Change Class', entity: 'Student', entityName: sName(s), field: 'Class', before: getClass(s.classId)?.name||'', after: getClass(newClassId)?.name||'', timestamp: new Date().toISOString() });
+  }
+  if (newProvId !== s.providerId) {
+    s.providerId = newProvId;
+    AUDIT_LOG.unshift({ id: genId('a'), action: 'Change Provider', entity: 'Student', entityName: sName(s), field: 'Provider', before: getProvider(s.providerId)?.name||'None', after: getProvider(newProvId)?.name||'None', timestamp: new Date().toISOString() });
+  }
+  s.notes = $('es_notes')?.value.trim() || '';
+  const e1 = $('es_email1')?.value.trim(), e2 = $('es_email2')?.value.trim();
+  s.emails = []; if (e1) s.emails.push(e1); if (e2) s.emails.push(e2);
+  overlay?.remove();
+  showToast('Student updated', 'success');
+  renderStudentProfile(sid);
+};
+
+// ── DASHBOARD — Division comparison overall trend ─────────────
+const _origRenderDashboard3 = renderDashboard;
+renderDashboard = function() {
+  const total = ASSESSMENTS.length, monthly = ASSESSMENTS.filter(a=>a.month===CUR_MONTH).length;
+  const improving = STUDENTS.filter(s=>getStudentTrend(s.id)==='up').length;
+  const struggling = STUDENTS.filter(s=>getStudentTrend(s.id)==='down').length;
+  const alerts = getAlerts();
+
+  $('pageContent').innerHTML = `
+<div class="page-header">
+  <div><h1 class="page-title">Dashboard</h1><p class="page-subtitle" style="font-size:0.95rem;font-weight:700;color:#005778">Ichud Boys Program — Kriah Tracking</p><p class="page-subtitle">Year-to-date — <span class="he">${CUR_YEAR}</span></p></div>
+  <div style="display:flex;gap:8px"><button class="btn btn-outline btn-sm" onclick="navigate('analytics')">Analytics</button><button class="btn btn-primary btn-sm" onclick="navigate('send_results')">📧 Send Results</button></div>
+</div>
+
+<!-- DIVISION COMPARISON — Overall Trend -->
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px">
+  ${DIVISIONS.map(div => {
+    const ss = getDivisionStudents(div.id);
+    const cls = getDivisionClasses(div.id);
+    const imp = ss.filter(s=>getStudentTrend(s.id)==='up').length;
+    const str = ss.filter(s=>getStudentTrend(s.id)==='down').length;
+    const flat = ss.length - imp - str;
+    const impPct = ss.length ? Math.round(imp/ss.length*100) : 0;
+    const trend = imp > str ? 'up' : str > imp ? 'down' : 'flat';
+    return `<div class="card" style="cursor:pointer;border-top:4px solid ${div.color}" onclick="navigate('programs')">
+      <div class="card-body" style="padding:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div style="font-size:1rem;font-weight:800;color:${div.color}">${div.name}</div>
+          <span style="font-size:1.4rem">${trend==='up'?'↑':trend==='down'?'↓':'→'}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;text-align:center;margin-bottom:10px">
+          <div style="background:#e4f2eb;border-radius:6px;padding:6px"><div style="font-size:1.1rem;font-weight:900;color:#1a6038">${imp}</div><div style="font-size:0.62rem;color:#1a6038;font-weight:700">↑ Improving</div></div>
+          <div style="background:#f5f5f5;border-radius:6px;padding:6px"><div style="font-size:1.1rem;font-weight:900;color:#808285">${flat}</div><div style="font-size:0.62rem;color:#808285;font-weight:700">→ Stable</div></div>
+          <div style="background:#fdecea;border-radius:6px;padding:6px"><div style="font-size:1.1rem;font-weight:900;color:#9a1c1c">${str}</div><div style="font-size:0.62rem;color:#9a1c1c;font-weight:700">↓ At Risk</div></div>
+        </div>
+        <div style="background:#f0ece4;border-radius:20px;height:6px;overflow:hidden">
+          <div style="height:100%;border-radius:20px;background:${div.color};width:${impPct}%;transition:width 0.6s"></div>
+        </div>
+        <div style="font-size:0.72rem;color:#808285;margin-top:5px;text-align:center">${impPct}% improving · ${cls.length} classes · ${ss.length} students</div>
+      </div>
+    </div>`;
+  }).join('')}
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi-card" onclick="navigate('students')" style="cursor:pointer"><div class="kpi-icon" style="background:#e0eef5;color:#005778"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><div class="kpi-value">${STUDENTS.length}</div><div class="kpi-label">Total Students</div><div class="kpi-trend up">↑ <span class="he">${CUR_YEAR}</span></div></div>
+  <div class="kpi-card gold" onclick="navigate('programs')" style="cursor:pointer"><div class="kpi-icon" style="background:#fdf3e3;color:#D9A44E"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><div class="kpi-value">${CLASSES.length}</div><div class="kpi-label">Classes</div><div class="kpi-trend neutral">${PROVIDERS.length} providers</div></div>
+  <div class="kpi-card success"><div class="kpi-icon" style="background:#e4f2eb;color:#1a6038"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div><div class="kpi-value">${total}</div><div class="kpi-label">YTD Assessments</div><div class="kpi-trend up">↑ ${monthly} this month</div></div>
+  <div class="kpi-card ${improving>=struggling?'success':'warning'}"><div class="kpi-icon" style="background:${improving>=struggling?'#e4f2eb':'#fff3e0'};color:${improving>=struggling?'#1a6038':'#7a4800'}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div><div class="kpi-value">${improving}</div><div class="kpi-label">Improving</div><div class="kpi-trend ${struggling>0?'down':'up'}">${struggling} need attention</div></div>
+</div>
+
+${alerts.length?`<div class="card mb-6"><div class="card-header"><span class="card-title">Active Alerts</span><span class="badge badge-danger">${alerts.length}</span></div><div class="card-body" style="padding:14px"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px">${alerts.slice(0,6).map(a=>`<div class="alert alert-${a.type}" style="margin:0;cursor:pointer" onclick="navigate('student_profile',{studentId:'${a.studentId}'})"><div><div style="font-weight:700;font-size:0.84rem">${a.title}</div><div style="font-size:0.76rem;margin-top:2px">${a.message}</div></div></div>`).join('')}</div></div></div>`:''}
+
+<div class="grid-2 mb-6">
+  <div class="card"><div class="card-header"><span class="card-title">Category Trends — YTD</span></div><div class="card-body"><div class="chart-container"><canvas id="catChart"></canvas></div></div></div>
+  <div class="card"><div class="card-header"><span class="card-title">Division Overall Trend</span></div><div class="card-body"><div class="chart-container"><canvas id="divChart"></canvas></div></div></div>
+</div>
+
+<div class="grid-2">
+  <div class="card"><div class="card-header"><span class="card-title">Recent Activity</span><button class="btn btn-ghost btn-sm" onclick="navigate('admin')">View All</button></div><div class="card-body" style="padding:0 20px">${SYS_LOGS.slice(0,6).map(l=>`<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid #e8d9b8;font-size:0.82rem"><div style="width:7px;height:7px;border-radius:50%;margin-top:5px;flex-shrink:0;background:${{success:'#1a6038',warning:'#D9A44E',danger:'#9a1c1c',info:'#005778'}[l.type]||'#808285'}"></div><div style="font-size:0.7rem;color:#808285;white-space:nowrap;min-width:80px">${fmtTime(l.timestamp)}</div><div style="flex:1;color:#444">${l.message}</div></div>`).join('')}</div></div>
+  <div class="card"><div class="card-header"><span class="card-title">Students — <span class="he">סיון תשפ״ו</span></span><button class="btn btn-ghost btn-sm" onclick="navigate('students')">All Students</button></div><div class="card-body" style="padding:0"><table><thead><tr><th>Student</th><th>Class</th><th>Division</th><th>Trend</th></tr></thead><tbody>${STUDENTS.slice(0,7).map((s,i)=>{const t=getStudentTrend(s.id),cls=getClass(s.classId),div=getClassDivision(s.classId);return`<tr class="clickable" onclick="navigate('student_profile',{studentId:'${s.id}'})"><td class="primary"><div style="display:flex;align-items:center;gap:8px"><div class="user-avatar" style="width:28px;height:28px;font-size:0.65rem;background:${avatarColor(i)}">${initials(sName(s))}</div><span class="he">${sName(s)}</span></div></td><td style="font-size:0.8rem">${cls?cls.name:'—'}</td><td style="font-size:0.8rem;color:#005778;font-weight:600">${div?div.name:'—'}</td><td>${trendIcon(t)}</td></tr>`;}).join('')}</tbody></table></div></div>
+</div>`;
+
+  setTimeout(() => {
+    const c1 = $('catChart');
+    if (c1) { const months=HEB_MONTHS.slice(0,9);_charts.cat=new Chart(c1,{type:'line',data:{labels:months.map(m=>m.label),datasets:CATS.map(cat=>({label:cat.label,tension:0.4,fill:false,pointRadius:3,borderColor:cat.color,backgroundColor:cat.color+'20',data:months.map(m=>{const ass=ASSESSMENTS.filter(a=>a.month===m.id);return ass.length?Math.round(ass.reduce((s,a)=>s+(a.categories[cat.id]?.correct||0),0)/ass.length*10)/10:null;})}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10},padding:8}}},scales:{x:{grid:{color:'#f0f0f0'}},y:{beginAtZero:true,grid:{color:'#f0f0f0'}}}}}); }
+    // Division overall trend — doughnut per division
+    const c2 = $('divChart');
+    if (c2) {
+      _charts.div = new Chart(c2, {
+        type: 'bar',
+        data: {
+          labels: DIVISIONS.map(d => d.name),
+          datasets: [
+            { label: '↑ Improving', data: DIVISIONS.map(d => getDivisionStudents(d.id).filter(s=>getStudentTrend(s.id)==='up').length), backgroundColor: '#1a6038CC', borderColor: '#1a6038', borderWidth: 1 },
+            { label: '→ Stable',    data: DIVISIONS.map(d => { const ss=getDivisionStudents(d.id); return ss.filter(s=>getStudentTrend(s.id)==='flat').length; }), backgroundColor: '#808285CC', borderColor: '#808285', borderWidth: 1 },
+            { label: '↓ At Risk',   data: DIVISIONS.map(d => getDivisionStudents(d.id).filter(s=>getStudentTrend(s.id)==='down').length), backgroundColor: '#9a1c1cCC', borderColor: '#9a1c1c', borderWidth: 1 },
+          ],
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 10 } } }, scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, beginAtZero: true, grid: { color: '#f0f0f0' } } } }
+      });
+    }
+  }, 80);
+};
+
+// ── ANALYTICS — combined, cleaned up ─────────────────────────
+const _origRenderAnalytics5 = renderAnalytics;
+renderAnalytics = function() {
+  const imp = STUDENTS.filter(s=>getStudentTrend(s.id)==='up');
+  const str = STUDENTS.filter(s=>getStudentTrend(s.id)==='down');
+  $('pageContent').innerHTML = `
+<div class="page-header"><div><h1 class="page-title">Analytics</h1><p class="page-subtitle">Ichud Boys Program — Full analytics & programs comparison</p></div></div>
+
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px">
+  <div class="kpi-card success"><div class="kpi-value">${imp.length}</div><div class="kpi-label">Improving</div></div>
+  <div class="kpi-card danger"><div class="kpi-value">${str.length}</div><div class="kpi-label">At Risk</div></div>
+  <div class="kpi-card"><div class="kpi-value">${ASSESSMENTS.length}</div><div class="kpi-label">Total Assessments</div></div>
+  <div class="kpi-card gold"><div class="kpi-value">${HEB_MONTHS.filter(m=>ASSESSMENTS.some(a=>a.month===m.id)).length}</div><div class="kpi-label">Active Months</div></div>
+</div>
+
+<!-- DIVISION COMPARISON -->
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px">
+  ${DIVISIONS.map(div => {
+    const ss = getDivisionStudents(div.id);
+    const cls = getDivisionClasses(div.id);
+    const imp2 = ss.filter(s=>getStudentTrend(s.id)==='up').length;
+    const str2 = ss.filter(s=>getStudentTrend(s.id)==='down').length;
+    return `<div class="card" style="border-top:4px solid ${div.color}">
+      <div class="card-body" style="padding:16px">
+        <div style="font-size:1rem;font-weight:800;color:${div.color};margin-bottom:10px">${div.name}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;text-align:center">
+          <div style="background:#e4f2eb;border-radius:6px;padding:6px"><div style="font-size:1.1rem;font-weight:900;color:#1a6038">${imp2}</div><div style="font-size:0.62rem;color:#1a6038;font-weight:700">↑ Improving</div></div>
+          <div style="background:#f5f5f5;border-radius:6px;padding:6px"><div style="font-size:1.1rem;font-weight:900;color:#808285">${ss.length-imp2-str2}</div><div style="font-size:0.62rem;color:#808285;font-weight:700">→ Stable</div></div>
+          <div style="background:#fdecea;border-radius:6px;padding:6px"><div style="font-size:1.1rem;font-weight:900;color:#9a1c1c">${str2}</div><div style="font-size:0.62rem;color:#9a1c1c;font-weight:700">↓ At Risk</div></div>
+        </div>
+        <div style="font-size:0.72rem;color:#808285;margin-top:8px;text-align:center">${cls.length} classes · ${ss.length} students</div>
+      </div>
+    </div>`;
+  }).join('')}
+</div>
+
+<div class="grid-2 mb-6">
+  <div class="card"><div class="card-header"><span class="card-title">Most Improved Students</span></div><div class="card-body" style="padding:0"><table><thead><tr><th>Student</th><th>Class</th><th>Division</th><th>#</th></tr></thead><tbody>${imp.slice(0,6).map((s,i)=>{const cls=getClass(s.classId),div=getClassDivision(s.classId);return`<tr class="clickable" onclick="navigate('student_profile',{studentId:'${s.id}'})"><td class="primary"><div style="display:flex;align-items:center;gap:8px"><div class="user-avatar" style="width:26px;height:26px;font-size:0.62rem;background:${avatarColor(i)}">${initials(sName(s))}</div><span class="he">${sName(s)}</span></div></td><td style="font-size:0.8rem">${cls?cls.name:'—'}</td><td style="font-size:0.8rem;color:#005778;font-weight:600">${div?div.name:'—'}</td><td><span class="badge badge-blue">${getStudentAssessments(s.id).length}</span></td></tr>`;}).join('')}${imp.length===0?'<tr><td colspan="4" style="text-align:center;padding:20px;color:#808285">No data</td></tr>':''}</tbody></table></div></div>
+  <div class="card"><div class="card-header"><span class="card-title">At-Risk Students</span></div><div class="card-body" style="padding:0"><table><thead><tr><th>Student</th><th>Class</th><th>Division</th><th>Action</th></tr></thead><tbody>${str.slice(0,6).map((s,i)=>{const cls=getClass(s.classId),div=getClassDivision(s.classId);return`<tr class="clickable" style="background:#fdecea" onclick="navigate('student_profile',{studentId:'${s.id}'})"><td class="primary"><div style="display:flex;align-items:center;gap:8px"><div class="user-avatar" style="width:26px;height:26px;font-size:0.62rem;background:${avatarColor(i)}">${initials(sName(s))}</div><span class="he">${sName(s)}</span></div></td><td style="font-size:0.8rem">${cls?cls.name:'—'}</td><td style="font-size:0.8rem;color:#005778;font-weight:600">${div?div.name:'—'}</td><td onclick="event.stopPropagation()"><button class="btn btn-outline btn-sm" onclick="navigate('student_profile',{studentId:'${s.id}'})">Review</button></td></tr>`;}).join('')}${str.length===0?'<tr><td colspan="4" style="text-align:center;padding:20px;color:#808285">No at-risk students</td></tr>':''}</tbody></table></div></div>
+</div>
+
+<div class="grid-2 mb-6">
+  <div class="card"><div class="card-header"><span class="card-title">Trend Distribution</span></div><div class="card-body"><div style="position:relative;height:220px"><canvas id="tChart"></canvas></div></div></div>
+  <div class="card"><div class="card-header"><span class="card-title">Division Comparison — Category Averages</span></div><div class="card-body"><div style="position:relative;height:220px"><canvas id="divCompChart"></canvas></div></div></div>
+</div>
+
+<!-- DIVISION BREAKDOWN — no categories -->
+<div class="card mb-6">
+  <div class="card-header"><span class="card-title">Division Breakdown</span></div>
+  <div class="table-wrapper"><table>
+    <thead><tr><th>Division</th><th>Classes</th><th>Students</th><th>Improving</th><th>Stable</th><th>At Risk</th><th>Assessments</th></tr></thead>
+    <tbody>${DIVISIONS.map(div=>{const ss=getDivisionStudents(div.id),ass=ASSESSMENTS.filter(a=>ss.some(s=>s.id===a.studentId)),im=ss.filter(s=>getStudentTrend(s.id)==='up').length,st=ss.filter(s=>getStudentTrend(s.id)==='down').length,fl=ss.length-im-st;return`<tr><td class="primary" style="font-weight:800;color:${div.color}">${div.name}</td><td><span class="badge badge-blue">${getDivisionClasses(div.id).length}</span></td><td><span class="badge badge-neutral">${ss.length}</span></td><td><span class="badge badge-success">${im}</span></td><td><span class="badge badge-neutral">${fl}</span></td><td><span class="badge badge-danger">${st}</span></td><td><span class="badge badge-neutral">${ass.length}</span></td></tr>`;}).join('')}
+    </tbody>
+  </table></div>
+</div>
+
+<!-- PROVIDER CASELOAD — no categories -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Provider Caseload Performance</span></div>
+  <div class="table-wrapper"><table>
+    <thead><tr><th>Provider</th><th>Students</th><th>Improving</th><th>Stable</th><th>At Risk</th><th>Assessments</th></tr></thead>
+    <tbody>${PROVIDERS.map(prov=>{const ss=getProviderStudents(prov.id),ass=ASSESSMENTS.filter(a=>ss.some(s=>s.id===a.studentId)),im=ss.filter(s=>getStudentTrend(s.id)==='up').length,st=ss.filter(s=>getStudentTrend(s.id)==='down').length,fl=ss.length-im-st;return`<tr><td class="primary">${prov.name}</td><td><span class="badge badge-neutral">${ss.length}</span></td><td><span class="badge badge-success">${im}</span></td><td><span class="badge badge-neutral">${fl}</span></td><td><span class="badge badge-danger">${st}</span></td><td><span class="badge badge-neutral">${ass.length}</span></td></tr>`;}).join('')}
+    </tbody>
+  </table></div>
+</div>`;
+
+  setTimeout(()=>{
+    const up=imp.length,down=str.length,flat=STUDENTS.length-up-down;
+    const c1=$('tChart');if(c1)_charts.t=new Chart(c1,{type:'doughnut',data:{labels:['Improving','Stable','At Risk'],datasets:[{data:[up,flat,down],backgroundColor:['#1a6038','#808285','#9a1c1c'],borderWidth:2,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:11},padding:10}}}}});
+    const c2=$('divCompChart');if(c2){_charts.divComp=new Chart(c2,{type:'bar',data:{labels:CATS.map(c=>c.label),datasets:DIVISIONS.map(div=>{const ss=getDivisionStudents(div.id),ass=ASSESSMENTS.filter(a=>ss.some(s=>s.id===a.studentId));return{label:div.name,backgroundColor:div.color+'CC',borderColor:div.color,borderWidth:2,data:CATS.map(cat=>ass.length?Math.round(ass.reduce((s,a)=>s+(a.categories[cat.id]?.correct||0),0)/ass.length*10)/10:0)};})},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:11},padding:10}}},scales:{x:{grid:{display:false}},y:{beginAtZero:true,grid:{color:'#f0f0f0'}}}}});}
+  },80);
+};
+
+// ── EXCEL EXPORT ──────────────────────────────────────────────
+function exportToExcel() {
+  // Build CSV with all data for Excel import
+  const rows = [
+    ['KriahTrack Export — Ichud Boys Program', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+    ['Generated:', new Date().toLocaleDateString(), '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+    [],
+    ['STUDENTS'],
+    ['First Name','Last Name','Class','Division','Provider','Email 1','Email 2','Year','Assessments','Improving','Last Month'],
+    ...STUDENTS.map(s => {
+      const cls = getClass(s.classId);
+      const div = getClassDivision(s.classId);
+      const prov = getProvider(s.providerId);
+      const ass = getStudentAssessments(s.id);
+      const trend = getStudentTrend(s.id);
+      const lastA = ass[ass.length-1];
+      return [s.firstName, s.lastName, cls?.name||'', div?.name||'', prov?.name||'', (s.emails||[])[0]||'', (s.emails||[])[1]||'', s.year, ass.length, trend==='up'?'Yes':trend==='down'?'No':'Stable', lastA?getMonthLabel(lastA.month)+' '+lastA.year:''];
+    }),
+    [],
+    ['ASSESSMENTS'],
+    ['Student','Class','Division','Month','Year','אותיות','אות+נקודה','אות+נקודה+אות','מילים','תהילים','Source'],
+    ...ASSESSMENTS.map(a => {
+      const s = getStudent(a.studentId);
+      const cls = getClass(a.classId || s?.classId);
+      const div = getClassDivision(a.classId || s?.classId);
+      return [s?sName(s):'', cls?.name||'', div?.name||'', getMonthLabel(a.month), a.year,
+        a.categories.otiyot?.correct||0, a.categories.ot_nekuda?.correct||0, a.categories.ot_nekuda_ot?.correct||0,
+        a.categories.milim?.correct||0, a.categories.tehilim?.correct||0, a.source];
+    }),
+    [],
+    ['DIVISION SUMMARY'],
+    ['Division','Classes','Students','Improving','Stable','At Risk','Total Assessments'],
+    ...DIVISIONS.map(div => {
+      const ss = getDivisionStudents(div.id);
+      const ass = ASSESSMENTS.filter(a => ss.some(s=>s.id===a.studentId));
+      const im = ss.filter(s=>getStudentTrend(s.id)==='up').length;
+      const st = ss.filter(s=>getStudentTrend(s.id)==='down').length;
+      return [div.name, getDivisionClasses(div.id).length, ss.length, im, ss.length-im-st, st, ass.length];
+    }),
+    [],
+    ['PROVIDER PERFORMANCE'],
+    ['Provider','Email','Students','Improving','At Risk','Assessments'],
+    ...PROVIDERS.map(prov => {
+      const ss = getProviderStudents(prov.id);
+      const ass = ASSESSMENTS.filter(a=>ss.some(s=>s.id===a.studentId));
+      const im = ss.filter(s=>getStudentTrend(s.id)==='up').length;
+      const st = ss.filter(s=>getStudentTrend(s.id)==='down').length;
+      return [prov.name, prov.email||'', ss.length, im, st, ass.length];
+    }),
+  ];
+
+  const csv = rows.map(row => row.map(cell => `"${String(cell||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `KriahTrack_Export_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  showToast('Excel export downloaded (open with Excel)', 'success');
+  SYS_LOGS.unshift({ id: genId('l'), type: 'info', message: 'Excel export downloaded', timestamp: new Date().toISOString() });
+}
+
+// Add export button to analytics page header
+const _origRenderAnalytics6 = renderAnalytics;
+renderAnalytics = function() {
+  _origRenderAnalytics5();
+  setTimeout(() => {
+    const header = $('pageContent')?.querySelector('.page-header');
+    if (header && !header.querySelector('[onclick*="exportToExcel"]')) {
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-gold btn-sm';
+      btn.setAttribute('onclick', 'exportToExcel()');
+      btn.innerHTML = '📊 Export to Excel';
+      const actions = header.querySelector('div:last-child');
+      if (actions) actions.appendChild(btn);
+      else header.appendChild(btn);
+    }
+  }, 100);
+};
